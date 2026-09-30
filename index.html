@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cambridge English: Advanced — Unit 1: Happiness & Success | Interactive Presentation</title>
+  <meta name="description" content="Interactive digital presentation and workbook covering Unit 1 (Pages 14–18): Listening & Speaking, Reading Part 3, and Use of English Gerunds & Infinitives.">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <div class="app-wrapper">
+    <!-- Top Navigation Bar -->
+    <header class="app-navbar">
+      <div class="brand-section">
+        <button class="icon-btn" id="slide-drawer-toggle" title="Slide Overview Deck">
+          <span class="nav-symbol">≡</span> <span class="btn-label">Contents</span>
+        </button>
+        <div class="brand-emblem">C1</div>
+        <div class="brand-text">
+          <h1>Cambridge English: Advanced (CAE)</h1>
+          <span>Unit 1: Happiness &amp; Success &bull; Pages 14&ndash;18</span>
+        </div>
+      </div>
+
+      <!-- Mode Switcher & Teacher / Presenter Controls -->
+      <div class="nav-controls-group">
+        <div class="mode-switcher" role="tablist">
+          <button class="mode-btn active" id="view-pres-btn" role="tab" title="Classroom Slideshow Mode">
+            Presentation Deck
+          </button>
+          <button class="mode-btn" id="view-book-btn" role="tab" title="Digital Textbook Workbook Mode">
+            Digital Textbook
+          </button>
+        </div>
+
+        <button class="icon-btn" id="teacher-mode-btn" title="Toggle Teacher Key & Solutions (Shortcut: K)">
+          <span class="btn-label">Teacher Key: OFF</span>
+        </button>
+
+        <button class="icon-btn" id="timer-modal-toggle" title="Open 1-Minute Speaking Exam Timer (Shortcut: T)">
+          <span class="btn-label">Exam Timer (60s)</span>
+        </button>
+
+        <button class="icon-btn" id="sfx-toggle-btn" title="Toggle Audio Signals">
+          <span id="sfx-icon">Audio: ON</span>
+        </button>
+
+        <button class="icon-btn" id="fullscreen-btn" title="Toggle Fullscreen Presentation (Shortcut: F)">
+          <span class="btn-label">Fullscreen</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Slide Progress Strip -->
+    <div class="progress-strip">
+      <div class="progress-fill" id="slide-progress-bar" style="width: 0%;"></div>
+    </div>
+
+    <!-- Main Presentation Container -->
+    <main class="presentation-container" id="presentation-container">
+      <div class="slide-viewport" id="slide-viewport">
+        <!-- Injected Slide Content -->
+        <div id="slide-content-area"></div>
+      </div>
+
+      <!-- Grounded Presenter Footer Dock -->
+      <nav class="presentation-dock" aria-label="Slide Navigation">
+        <button class="dock-btn" id="prev-slide-btn" title="Previous Slide (Shortcut: Left Arrow)">
+          &larr; Previous
+        </button>
+        <span class="dock-counter" id="slide-counter">Slide 01 of 15</span>
+        <button class="dock-btn dock-btn-main" id="next-slide-btn" title="Next Slide (Shortcut: Right Arrow or Space)">
+          Next Slide &rarr;
+        </button>
+      </nav>
+    </main>
+
+    <!-- Full Workbook Container (Hidden by default, shown in workbook mode) -->
+    <main class="workbook-container hidden" id="workbook-container">
+      <!-- Injected by app.js -->
+    </main>
+
+    <!-- Slide Deck Drawer (Sidebar) -->
+    <aside class="slide-drawer" id="slide-drawer" aria-label="Slide Outline">
+      <div class="drawer-header">
+        <h3>Unit 1 Slide Outline</h3>
+        <button class="icon-btn" id="drawer-close-btn">Close</button>
+      </div>
+      <div class="drawer-slides-list" id="drawer-slides-list">
+        <!-- Injected by app.js -->
+      </div>
+    </aside>
+
+    <!-- Cambridge Exam Speaking Timer Modal -->
+    <div class="timer-modal" id="timer-modal" role="dialog" aria-modal="true" aria-labelledby="timer-modal-title">
+      <div class="timer-modal-content">
+        <h3 id="timer-modal-title">Speaking Exam Countdown</h3>
+        <p class="text-muted" style="font-size: 13px; margin-top: 4px;">Cambridge C1 Advanced Speaking Part 2</p>
+
+        <!-- SVG Circular Progress Animation -->
+        <div class="timer-visual-circle">
+          <svg class="timer-svg" viewBox="0 0 100 100">
+            <circle class="timer-track" cx="50" cy="50" r="45"></circle>
+            <circle class="timer-ring" id="timer-progress-ring" cx="50" cy="50" r="45"></circle>
+          </svg>
+          <div class="timer-inner-text">
+            <span class="timer-time-display" id="timer-display">01:00</span>
+            <span class="timer-status" id="timer-status">Ready (60s)</span>
+          </div>
+        </div>
+
+        <div class="timer-presets-row">
+          <button class="btn btn-sm btn-outline" id="timer-preset-60">1:00 Min (Candidate Turn)</button>
+          <button class="btn btn-sm btn-outline" id="timer-preset-120">2:00 Min (Collaborative)</button>
+        </div>
+
+        <div class="timer-actions-row">
+          <button class="btn btn-primary" id="timer-start-btn">Start</button>
+          <button class="btn btn-outline" id="timer-pause-btn">Pause</button>
+          <button class="btn btn-ghost" id="timer-reset-btn">Reset</button>
+          <button class="btn btn-ghost" id="timer-modal-close">Close</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
