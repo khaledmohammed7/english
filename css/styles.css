@@ -1670,16 +1670,15 @@ html, body {
 }
 
 .rewrite-card {
-  padding: 10px 16px;
+  padding: 12px 16px;
   background: #ffffff;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
-  cursor: pointer;
   transition: var(--transition-smooth);
 }
 
 .rewrite-card:hover {
-  border-color: var(--brand-navy);
+  border-color: var(--border-mid);
 }
 
 .rw-target-tag {
@@ -1692,11 +1691,206 @@ html, body {
   border-radius: var(--radius-sm);
 }
 
+.rewrite-input-wrap {
+  margin-top: 8px;
+  display: flex;
+  gap: 10px;
+}
+
+.rewrite-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  color: var(--text-ink-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+.rewrite-input:focus {
+  border-color: var(--brand-navy);
+  outline: none;
+}
+
 .rewrite-reveal {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--border-light);
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: #f0fdf4;
+  border: 1px solid var(--status-success-border);
   color: var(--status-success);
+  font-size: 13.5px;
+}
+
+/* Verb Complementation (Ex 4) */
+.verb-patterns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pattern-item-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  transition: var(--transition-smooth);
+}
+
+.pattern-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--brand-crimson);
+  min-width: 22px;
+  padding-top: 2px;
+}
+
+.pattern-sentence-content {
+  flex: 1;
+}
+
+.sentence-text {
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--text-ink-primary);
+}
+
+.inline-gap-box {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  margin: 0 4px;
+  vertical-align: middle;
+}
+
+.ex4-input {
+  display: inline-block;
+  min-width: 95px;
+  max-width: 140px;
+  padding: 4px 8px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-ink-primary);
+  background: #ffffff;
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: var(--transition-smooth);
+}
+
+.ex4-input:focus {
+  border-color: var(--brand-navy);
+  box-shadow: 0 0 0 2px rgba(10, 37, 64, 0.12);
+}
+
+.inline-gap-box.gap-ok .ex4-input {
+  border-color: var(--status-success);
+  background-color: var(--status-success-bg);
+  color: var(--status-success);
+}
+
+.inline-gap-box.gap-err .ex4-input {
+  border-color: var(--status-danger);
+  background-color: var(--status-danger-bg);
+  color: var(--status-danger);
+}
+
+.key-tooltip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--status-success);
+  background: var(--status-success-bg);
+  border: 1px solid var(--status-success-border);
+  border-radius: var(--radius-sm);
+}
+
+.pattern-rules-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.rule-chip {
+  display: inline-block;
+  font-size: 12px;
+  padding: 3px 10px;
+  background: #f1f5f9;
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  color: var(--text-ink-secondary);
+}
+
+/* Interactive Synonyms Section (Slide 9 & Workbook) */
+.synonyms-interactive-box {
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+}
+
+.synonym-inputs-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 14px 0;
+}
+
+.synonym-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.synonym-input-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-ink-muted);
+}
+
+.synonym-input {
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+.synonym-input:focus {
+  border-color: var(--brand-navy);
+  outline: none;
+}
+
+.synonym-input.syn-correct {
+  border-color: var(--status-success);
+  background-color: var(--status-success-bg);
+  color: var(--status-success);
+}
+
+.synonym-input.syn-incorrect {
+  border-color: var(--status-danger);
+  background-color: var(--status-danger-bg);
+}
+
+.synonym-feedback-card {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
   font-size: 13.5px;
 }
 

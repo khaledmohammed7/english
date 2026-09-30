@@ -275,12 +275,15 @@
         listeningPart4Task2: {},
         listeningPart2Gaps: {},
         readingMC: {},
+        synonymsMiserable: ["", "", ""],
         everydayEnglish: {},
         useOfEnglish1a: {},
         useOfEnglish2a: {},
         useOfEnglish3a: {},
+        useOfEnglish3b: {},
         useOfEnglish4: {},
-        useOfEnglish5: {}
+        useOfEnglish5: {},
+        checked: {}
       };
 
       this.loadSavedState();
@@ -301,9 +304,25 @@
         const saved = localStorage.getItem('cambridge_unit1_state');
         if (saved) {
           this.studentState = Object.assign(this.studentState, JSON.parse(saved));
+          if (!this.studentState.checked) {
+            this.studentState.checked = {};
+          }
         }
       } catch (e) {
         console.error("State loading error:", e);
+      }
+    }
+
+    updateView() {
+      if (this.viewMode === 'presentation') {
+        this.renderCurrentSlide();
+      } else {
+        const bookContainer = document.getElementById('workbook-container');
+        const scrollPos = bookContainer ? bookContainer.scrollTop : 0;
+        const winScrollPos = window.scrollY;
+        this.renderWorkbook();
+        if (bookContainer && scrollPos) bookContainer.scrollTop = scrollPos;
+        if (winScrollPos) window.scrollTo(0, winScrollPos);
       }
     }
 
@@ -720,11 +739,12 @@
 
               <div class="matching-items-list">
                 ${p.speakers.map((sp, i) => {
+                  const isChecked = !!(this.studentState.checked && this.studentState.checked.listeningPart4);
                   const currentVal = state1[sp.id] || "";
                   const isCorrect = currentVal === sp.task1Answer;
-                  const showFeedback = currentVal !== "" || this.isTeacherMode;
+                  const showFeedback = this.isTeacherMode || isChecked;
                   return `
-                    <div class="match-row ${showFeedback ? (isCorrect || this.isTeacherMode ? 'row-correct' : 'row-incorrect') : ''}">
+                    <div class="match-row ${showFeedback ? (isCorrect ? 'row-correct' : 'row-incorrect') : ''}">
                       <span class="match-num">${i + 1}</span>
                       <span class="match-speaker">${sp.speakerLabel}</span>
                       <div class="match-select-box">
@@ -736,7 +756,7 @@
                             </option>
                           `).join('')}
                         </select>
-                        ${this.isTeacherMode ? `<span class="answer-pill">Key: ${sp.task1Answer}</span>` : ''}
+                        ${this.isTeacherMode || (isChecked && !isCorrect) ? `<span class="answer-pill">Key: ${sp.task1Answer}</span>` : ''}
                       </div>
                     </div>
                   `;
@@ -759,11 +779,12 @@
 
               <div class="matching-items-list">
                 ${p.speakers.map((sp, i) => {
+                  const isChecked = !!(this.studentState.checked && this.studentState.checked.listeningPart4);
                   const currentVal = state2[sp.id] || "";
                   const isCorrect = currentVal === sp.task2Answer;
-                  const showFeedback = currentVal !== "" || this.isTeacherMode;
+                  const showFeedback = this.isTeacherMode || isChecked;
                   return `
-                    <div class="match-row ${showFeedback ? (isCorrect || this.isTeacherMode ? 'row-correct' : 'row-incorrect') : ''}">
+                    <div class="match-row ${showFeedback ? (isCorrect ? 'row-correct' : 'row-incorrect') : ''}">
                       <span class="match-num">${i + 6}</span>
                       <span class="match-speaker">${sp.speakerLabel}</span>
                       <div class="match-select-box">
@@ -775,7 +796,7 @@
                             </option>
                           `).join('')}
                         </select>
-                        ${this.isTeacherMode ? `<span class="answer-pill">Key: ${sp.task2Answer}</span>` : ''}
+                        ${this.isTeacherMode || (isChecked && !isCorrect) ? `<span class="answer-pill">Key: ${sp.task2Answer}</span>` : ''}
                       </div>
                     </div>
                   `;
@@ -787,8 +808,29 @@
           <!-- Actions Bar -->
           <div class="actions-bar">
             <button class="btn btn-success" id="check-part4-btn">Check Part 4 Answers</button>
-            <button class="btn btn-outline" id="reveal-part4-btn">Reveal Explanations</button>
-            <div id="part4-feedback-box" class="feedback-box hidden"></div>
+            ${(() => {
+              const isChecked = !!(this.studentState.checked && this.studentState.checked.listeningPart4);
+              if (!isChecked && !this.isTeacherMode) return '';
+              let score = 0;
+              p.speakers.forEach(sp => {
+                if (state1[sp.id] === sp.task1Answer) score++;
+                if (state2[sp.id] === sp.task2Answer) score++;
+              });
+              const isFull = score === 10;
+              return `
+                <div id="part4-feedback-box" class="feedback-box ${isFull ? 'feedback-success' : 'feedback-info'}">
+                  <strong>Score: ${score} / 10</strong> ${isFull ? 'Outstanding! All matches correct.' : 'Review explanations below:'}
+                  <div class="mt-2">
+                    <h4 style="font-size: 13px; margin: 8px 0 4px 0;">Auditory Clues & Explanations:</h4>
+                    <ul style="padding-left: 18px; font-size: 12.5px;">
+                      ${p.speakers.map(sp => `
+                        <li><strong>${sp.speakerLabel}:</strong> ${sp.explanation} <em>(Task 1: [${sp.task1Answer}], Task 2: [${sp.task2Answer}])</em></li>
+                      `).join('')}
+                    </ul>
+                  </div>
+                </div>
+              `;
+            })()}
           </div>
 
           <!-- Discussion 1c -->
@@ -868,33 +910,11 @@
           if (this.studentState.listeningPart4Task2[sp.id] === sp.task2Answer) score++;
         });
 
-        const feedbackBox = container.querySelector('#part4-feedback-box');
-        if (feedbackBox) {
-          feedbackBox.classList.remove('hidden');
-          const isFull = score === 10;
-          if (score >= 8) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-          feedbackBox.className = `feedback-box ${isFull ? 'feedback-success' : 'feedback-info'}`;
-          feedbackBox.innerHTML = `
-            <strong>Score: ${score} / 10</strong> ${isFull ? 'Outstanding! All speakers and topics matched perfectly.' : 'Review your matches or click Reveal Explanations.'}
-          `;
-        }
-        this.renderCurrentSlide();
-      });
-
-      container.querySelector('#reveal-part4-btn')?.addEventListener('click', () => {
-        const feedbackBox = container.querySelector('#part4-feedback-box');
-        if (feedbackBox) {
-          feedbackBox.classList.remove('hidden');
-          feedbackBox.className = 'feedback-box feedback-info';
-          feedbackBox.innerHTML = `
-            <h4>Auditory Clues & Explanations:</h4>
-            <ul>
-              ${this.data.listening.part4.speakers.map(sp => `
-                <li><strong>${sp.speakerLabel}:</strong> ${sp.explanation} <em>(Task 1: [${sp.task1Answer}], Task 2: [${sp.task2Answer}])</em></li>
-              `).join('')}
-            </ul>
-          `;
-        }
+        if (score >= 8) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+        this.studentState.checked = this.studentState.checked || {};
+        this.studentState.checked.listeningPart4 = true;
+        this.saveState();
+        this.updateView();
       });
     }
 
@@ -960,11 +980,12 @@
 
             <div class="gapfill-sentences">
               ${p.questions.map(q => {
+                const isChecked = !!(this.studentState.checked && this.studentState.checked.listeningPart2);
                 const currentVal = (state[q.num] || "").trim();
                 const isCorrect = q.acceptedAnswers.some(ans => ans.toLowerCase() === currentVal.toLowerCase());
-                const showCheck = currentVal !== "" || this.isTeacherMode;
+                const showCheck = this.isTeacherMode || isChecked;
                 return `
-                  <div class="gapfill-row ${showCheck ? (isCorrect || this.isTeacherMode ? 'gap-correct' : 'gap-incorrect') : ''}">
+                  <div class="gapfill-row ${showCheck ? (isCorrect ? 'gap-correct' : 'gap-incorrect') : ''}">
                     <span class="gap-num">${q.num}</span>
                     <span class="gap-text-lead">${q.lead}</span>
                     <div class="gap-input-wrapper">
@@ -977,7 +998,7 @@
                       <button class="btn-hint" data-gap="${q.num}" title="Show Hint">Hint</button>
                     </div>
                     <span class="gap-text-trail">${q.trail}</span>
-                    ${this.isTeacherMode ? `<span class="answer-tag">Key: ${q.displayAnswer}</span>` : ''}
+                    ${this.isTeacherMode || (isChecked && !isCorrect) ? `<span class="answer-tag">Key: ${q.displayAnswer}</span>` : ''}
                   </div>
                 `;
               }).join('')}
@@ -986,8 +1007,16 @@
             <div class="gapfill-footer">
               <button class="btn btn-success" id="check-gaps-btn">Check My Answers</button>
               <button class="btn btn-outline" id="show-all-hints-btn">Show All Hints</button>
-              <button class="btn btn-ghost" id="reveal-gaps-btn">Show Solution Key</button>
-              <div id="gap-score-display" class="gap-score-badge hidden"></div>
+              ${(() => {
+                const isChecked = !!(this.studentState.checked && this.studentState.checked.listeningPart2);
+                if (!isChecked && !this.isTeacherMode) return '<div id="gap-score-display" class="gap-score-badge hidden"></div>';
+                let score = 0;
+                p.questions.forEach(q => {
+                  const val = (state[q.num] || "").trim().toLowerCase();
+                  if (q.acceptedAnswers.some(ans => ans.toLowerCase() === val)) score++;
+                });
+                return `<div id="gap-score-display" class="gap-score-badge">Score: ${score} / 8 Correct!</div>`;
+              })()}
             </div>
           </div>
 
@@ -1059,26 +1088,16 @@
           }
         });
 
-        const scoreDisplay = container.querySelector('#gap-score-display');
-        if (scoreDisplay) {
-          scoreDisplay.classList.remove('hidden');
-          scoreDisplay.textContent = `Score: ${score} / 8 Correct!`;
-          if (score >= 6) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        }
-        this.renderCurrentSlide();
+        if (score >= 6) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+        this.studentState.checked = this.studentState.checked || {};
+        this.studentState.checked.listeningPart2 = true;
+        this.saveState();
+        this.updateView();
       });
 
       container.querySelector('#show-all-hints-btn')?.addEventListener('click', () => {
         const hints = p.questions.map(q => `[${q.num}] ${q.hint}`).join('\n\n');
         alert("Hints for all 8 gaps:\n\n" + hints);
-      });
-
-      container.querySelector('#reveal-gaps-btn')?.addEventListener('click', () => {
-        p.questions.forEach(q => {
-          this.studentState.listeningPart2Gaps[q.num] = q.displayAnswer;
-        });
-        this.saveState();
-        this.renderCurrentSlide();
       });
     }
 
@@ -1348,11 +1367,12 @@
             <!-- Dialogue Scenarios Interactive List -->
             <div class="dialogues-list">
               ${ee.scenarios.map(sc => {
+                const isChecked = !!(this.studentState.checked && this.studentState.checked.everydayEnglish);
                 const currentVal = state[sc.id] || "";
                 const isCorrect = currentVal.toLowerCase() === sc.bestResponse.toLowerCase();
-                const showCheck = currentVal !== "" || this.isTeacherMode;
+                const showCheck = this.isTeacherMode || isChecked;
                 return `
-                  <div class="dialogue-card ${showCheck ? (isCorrect || this.isTeacherMode ? 'card-correct' : 'card-incorrect') : ''}">
+                  <div class="dialogue-card ${showCheck ? (isCorrect ? 'card-correct' : 'card-incorrect') : ''}">
                     <div class="dialogue-speaker-a">
                       <span class="speaker-avatar">A</span>
                       <div class="bubble-a">
@@ -1371,7 +1391,7 @@
                             </option>
                           `).join('')}
                         </select>
-                        ${this.isTeacherMode ? `<span class="answer-tag">Key: ${sc.bestResponse}</span>` : ''}
+                        ${this.isTeacherMode || (isChecked && !isCorrect) ? `<span class="answer-tag">Key: ${sc.bestResponse}</span>` : ''}
                       </div>
                     </div>
                   </div>
@@ -1381,8 +1401,27 @@
 
             <div class="ee-actions">
               <button class="btn btn-success" id="check-ee-btn">Check Responses</button>
-              <button class="btn btn-outline" id="reveal-ee-btn">Reveal Answers & Tone Tips</button>
-              <div id="ee-score-box" class="feedback-box hidden"></div>
+              ${(() => {
+                const isChecked = !!(this.studentState.checked && this.studentState.checked.everydayEnglish);
+                if (!isChecked && !this.isTeacherMode) return '<div id="ee-score-box" class="feedback-box hidden"></div>';
+                let score = 0;
+                ee.scenarios.forEach(sc => {
+                  if (state[sc.id] === sc.bestResponse) score++;
+                });
+                return `
+                  <div id="ee-score-box" class="feedback-box feedback-info">
+                    <strong>Score: ${score} / ${ee.scenarios.length} Correct</strong>
+                    <div class="mt-2">
+                      <h4 style="font-size: 13px; margin: 8px 0 4px 0;">Nuance & Pragmatic Explanations:</h4>
+                      <ul style="padding-left: 18px; font-size: 12.5px;">
+                        ${ee.scenarios.map(sc => `
+                          <li><strong>Scenario ${sc.id}:</strong> <em>${sc.bestResponse}</em> – ${sc.explanation}</li>
+                        `).join('')}
+                      </ul>
+                    </div>
+                  </div>
+                `;
+              })()}
             </div>
           </div>
         </div>
@@ -1412,29 +1451,11 @@
         ee.scenarios.forEach(sc => {
           if (this.studentState.everydayEnglish[sc.id] === sc.bestResponse) score++;
         });
-        const box = container.querySelector('#ee-score-box');
-        if (box) {
-          box.classList.remove('hidden');
-          box.innerHTML = `<strong>Score: ${score} / ${ee.scenarios.length}</strong>`;
-          if (score === ee.scenarios.length) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        }
-        this.renderCurrentSlide();
-      });
-
-      container.querySelector('#reveal-ee-btn')?.addEventListener('click', () => {
-        const box = container.querySelector('#ee-score-box');
-        if (box) {
-          box.classList.remove('hidden');
-          box.className = 'feedback-box feedback-info';
-          box.innerHTML = `
-            <h4>Nuance & Pragmatic Explanations:</h4>
-            <ul>
-              ${ee.scenarios.map(sc => `
-                <li><strong>Scenario ${sc.id}:</strong> <em>${sc.bestResponse}</em> – ${sc.explanation}</li>
-              `).join('')}
-            </ul>
-          `;
-        }
+        if (score === ee.scenarios.length) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+        this.studentState.checked = this.studentState.checked || {};
+        this.studentState.checked.everydayEnglish = true;
+        this.saveState();
+        this.updateView();
       });
     }
 
@@ -1590,11 +1611,12 @@
 
           <div class="mc-quiz-container">
             ${r.questions.map(q => {
+              const isChecked = !!(this.studentState.checked && this.studentState.checked.readingMC);
               const currentChoice = state[q.id] || "";
               const isCorrect = currentChoice === q.correct;
-              const hasAnswered = currentChoice !== "" || this.isTeacherMode;
+              const showFeedback = this.isTeacherMode || isChecked;
               return `
-                <div class="mc-card ${hasAnswered ? (isCorrect || this.isTeacherMode ? 'mc-correct' : 'mc-incorrect') : ''}" id="mc-card-${q.id}">
+                <div class="mc-card ${showFeedback ? (isCorrect ? 'mc-correct' : 'mc-incorrect') : ''}" id="mc-card-${q.id}">
                   <div class="mc-question-title">
                     <h4>${q.question}</h4>
                   </div>
@@ -1603,7 +1625,7 @@
                       const isSelected = (this.isTeacherMode ? q.correct : currentChoice) === opt.letter;
                       const isTheRightOne = opt.letter === q.correct;
                       return `
-                        <label class="mc-option-label ${isSelected ? 'selected' : ''} ${this.isTeacherMode && isTheRightOne ? 'option-target' : ''}">
+                        <label class="mc-option-label ${isSelected ? 'selected' : ''} ${(this.isTeacherMode || (isChecked && isTheRightOne)) ? 'option-target' : ''}">
                           <input type="radio"
                             name="mc-q-${q.id}"
                             value="${opt.letter}"
@@ -1615,7 +1637,7 @@
                       `;
                     }).join('')}
                   </div>
-                  <div class="mc-explanation ${this.isTeacherMode ? '' : 'hidden'}" id="mc-exp-${q.id}">
+                  <div class="mc-explanation ${this.isTeacherMode || isChecked ? '' : 'hidden'}" id="mc-exp-${q.id}">
                     <strong>Correct Key: [${q.correct}]</strong> — ${q.explanation}
                   </div>
                 </div>
@@ -1625,8 +1647,15 @@
 
           <div class="mc-footer-actions">
             <button class="btn btn-success btn-lg" id="check-mc-btn">Score My Reading Answers</button>
-            <button class="btn btn-outline btn-lg" id="toggle-all-explanations-btn">Show / Hide Rationale</button>
-            <div id="mc-total-score-badge" class="score-badge-large hidden"></div>
+            ${(() => {
+              const isChecked = !!(this.studentState.checked && this.studentState.checked.readingMC);
+              if (!isChecked && !this.isTeacherMode) return '<div id="mc-total-score-badge" class="score-badge-large hidden"></div>';
+              let score = 0;
+              r.questions.forEach(q => {
+                if (state[q.id] === q.correct) score++;
+              });
+              return `<div id="mc-total-score-badge" class="score-badge-large">Score: ${score} / 7 (${Math.round((score / 7) * 100)}%)</div>`;
+            })()}
           </div>
         </div>
       `;
@@ -1649,24 +1678,11 @@
           if (this.studentState.readingMC[q.id] === q.correct) score++;
         });
 
-        const badge = container.querySelector('#mc-total-score-badge');
-        if (badge) {
-          badge.classList.remove('hidden');
-          badge.textContent = `Score: ${score} / 7 (${Math.round((score / 7) * 100)}%)`;
-          if (score >= 5) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        }
-        r.questions.forEach(q => {
-          const exp = container.querySelector(`#mc-exp-${q.id}`);
-          exp?.classList.remove('hidden');
-        });
-        this.renderCurrentSlide();
-      });
-
-      container.querySelector('#toggle-all-explanations-btn')?.addEventListener('click', () => {
-        r.questions.forEach(q => {
-          const exp = container.querySelector(`#mc-exp-${q.id}`);
-          exp?.classList.toggle('hidden');
-        });
+        if (score >= 5) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+        this.studentState.checked = this.studentState.checked || {};
+        this.studentState.checked.readingMC = true;
+        this.saveState();
+        this.updateView();
       });
     }
 
@@ -1683,26 +1699,50 @@
             <span class="badge badge-accent">Activities 3, 4 & 5</span>
           </div>
 
-          <!-- Activity 3a: Synonyms for Miserable -->
+          <!-- Activity 3a: Synonyms for Miserable (Interactive) -->
           <div class="vocab-workshop-card mb-4">
             <div class="workshop-header">
               <span class="section-tag">[Vocabulary Search]</span>
               <div>
                 <h4>3a. Find at least three words or phrases in the text which are synonyms for 'miserable':</h4>
-                <p>Click the cards below to reveal where they appear in the article:</p>
+                <p>Type the synonyms you discovered in the article text below, then click Check:</p>
               </div>
             </div>
-            <div class="synonym-cards-grid">
-              ${r.miserableSynonyms.map((s, idx) => `
-                <div class="synonym-card" onclick="this.classList.toggle('revealed')">
-                  <span class="syn-num">#${idx + 1}</span>
-                  <div class="syn-word-hidden">Click to Reveal</div>
-                  <div class="syn-word-shown">
-                    <strong>${s.word}</strong>
-                    <span class="syn-hint">${s.hint}</span>
-                  </div>
+
+            <div class="synonyms-interactive-box">
+              <div class="synonym-inputs-list">
+                ${[0, 1, 2].map(idx => {
+                  const val = ((this.studentState.synonymsMiserable && this.studentState.synonymsMiserable[idx]) || "").trim();
+                  const isChecked = !!(this.studentState.checked && this.studentState.checked.synonymsMiserable);
+                  const isMatch = r.miserableSynonyms.some(s => s.word.toLowerCase() === val.toLowerCase());
+                  const statusClass = isChecked ? (isMatch ? 'syn-correct' : 'syn-incorrect') : '';
+                  return `
+                    <div class="synonym-input-row">
+                      <label class="synonym-input-label">Synonym #${idx + 1}:</label>
+                      <input type="text"
+                        class="synonym-input ${statusClass}"
+                        data-syn-idx="${idx}"
+                        value="${this.isTeacherMode ? r.miserableSynonyms[idx].word : val}"
+                        placeholder="e.g. type synonym..." />
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+
+              <div class="actions-bar mt-2">
+                <button class="btn btn-success" id="check-synonyms-btn">Check Synonyms</button>
+              </div>
+
+              ${(this.studentState.checked && this.studentState.checked.synonymsMiserable) || this.isTeacherMode ? `
+                <div class="synonym-feedback-card mt-3">
+                  <strong>Synonyms in the Article:</strong>
+                  <ul style="padding-left: 20px; margin-top: 6px;">
+                    ${r.miserableSynonyms.map(s => `
+                      <li><strong>${s.word}</strong> — ${s.hint}</li>
+                    `).join('')}
+                  </ul>
                 </div>
-              `).join('')}
+              ` : ''}
             </div>
           </div>
 
@@ -1761,7 +1801,27 @@
       `;
     }
 
-    bindReadingVocabEvents() {}
+    bindReadingVocabEvents(container) {
+      container.querySelectorAll('.synonym-input').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const idx = parseInt(inp.getAttribute('data-syn-idx'), 10);
+          this.studentState.synonymsMiserable = this.studentState.synonymsMiserable || ["", "", ""];
+          this.studentState.synonymsMiserable[idx] = e.target.value;
+          this.saveState();
+        });
+      });
+
+      container.querySelector('#check-synonyms-btn')?.addEventListener('click', () => {
+        const r = this.data.reading;
+        const entered = (this.studentState.synonymsMiserable || []).map(w => (w || "").trim().toLowerCase()).filter(Boolean);
+        const matches = entered.filter(w => r.miserableSynonyms.some(s => s.word.toLowerCase() === w));
+        if (matches.length >= 2) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+        this.studentState.checked = this.studentState.checked || {};
+        this.studentState.checked.synonymsMiserable = true;
+        this.saveState();
+        this.updateView();
+      });
+    }
 
     votePoll(cardEl) {
       this.sfx.playClick();
@@ -1810,11 +1870,13 @@
           <!-- Exercises 2, 3, 4 -->
           <div class="transform-list">
             ${ex.items.map(item => {
+              const checkedMap = (this.studentState.checked && this.studentState.checked.useOfEnglish1a) || {};
+              const isChecked = !!checkedMap[item.id];
               const currentVal = state[item.id] || "";
               const isMatch = currentVal.trim().toLowerCase().replace(/[.,!]/g, '') === item.expected.toLowerCase().replace(/[.,!]/g, '');
-              const show = currentVal !== "" || this.isTeacherMode;
+              const show = this.isTeacherMode || isChecked;
               return `
-                <div class="transform-card ${show ? (isMatch || this.isTeacherMode ? 'card-correct' : 'card-incorrect') : ''}">
+                <div class="transform-card ${show ? (isMatch ? 'card-correct' : 'card-incorrect') : ''}">
                   <div class="orig-line">
                     <span class="item-num">${item.id}.</span>
                     <span class="orig-text">"${item.original}"</span>
@@ -1827,7 +1889,7 @@
                       placeholder="Rewrite starting with a gerund (-ing)..." />
                     <button class="btn btn-sm btn-outline check-single-1a" data-id="${item.id}">Check</button>
                   </div>
-                  ${this.isTeacherMode ? `<div class="model-key">Key: <strong>${item.expected}</strong></div>` : ''}
+                  ${this.isTeacherMode || isChecked ? `<div class="model-key">Model Answer: <strong>${item.expected}</strong></div>` : ''}
                 </div>
               `;
             }).join('')}
@@ -1876,14 +1938,16 @@
           const item = this.data.useOfEnglish.ex1a.items.find(i => i.id === id);
           const val = (this.studentState.useOfEnglish1a[id] || "").trim().toLowerCase().replace(/[.,!]/g, '');
           const expected = item.expected.toLowerCase().replace(/[.,!]/g, '');
+          this.studentState.checked = this.studentState.checked || {};
+          this.studentState.checked.useOfEnglish1a = this.studentState.checked.useOfEnglish1a || {};
+          this.studentState.checked.useOfEnglish1a[id] = true;
+          this.saveState();
           if (val === expected) {
             this.sfx.playCorrect();
-            alert("Correct! Grammatically sound gerund transformation.");
           } else {
             this.sfx.playIncorrect();
-            alert(`Almost! Model answer:\n"${item.expected}"`);
           }
-          this.renderCurrentSlide();
+          this.updateView();
         });
       });
     }
@@ -1910,11 +1974,12 @@
           <!-- 14 Prepositions Grid -->
           <div class="prep-cards-grid">
             ${ex.items.map(item => {
+              const isChecked = !!(this.studentState.checked && this.studentState.checked.useOfEnglish2a);
               const currentVal = (state[item.id] || "").trim().toLowerCase();
               const isMatch = currentVal === item.prep.toLowerCase() || (item.alt && currentVal === item.alt.toLowerCase());
-              const show = currentVal !== "" || this.isTeacherMode;
+              const show = this.isTeacherMode || isChecked;
               return `
-                <div class="prep-card ${show ? (isMatch || this.isTeacherMode ? 'prep-correct' : 'prep-incorrect') : ''}">
+                <div class="prep-card ${show ? (isMatch ? 'prep-correct' : 'prep-incorrect') : ''}">
                   <span class="prep-num">${item.id}</span>
                   <div class="prep-content">
                     <span class="prep-verb">${item.phrase}</span>
@@ -1924,7 +1989,7 @@
                       value="${this.isTeacherMode ? item.prep : currentVal}"
                       placeholder="..."
                       maxlength="10" />
-                    ${this.isTeacherMode ? `<span class="prep-key">[${item.prep}]</span>` : ''}
+                    ${this.isTeacherMode || (isChecked && !isMatch) ? `<span class="prep-key">[${item.prep}]</span>` : ''}
                   </div>
                   <div class="prep-tooltip" title="${item.example}">[Example]</div>
                 </div>
@@ -1934,8 +1999,16 @@
 
           <div class="actions-bar mt-4">
             <button class="btn btn-success" id="check-preps-btn">Check All 14 Prepositions</button>
-            <button class="btn btn-outline" id="reveal-preps-btn">Reveal Collocation Key</button>
-            <div id="preps-score-box" class="feedback-box hidden"></div>
+            ${(() => {
+              const isChecked = !!(this.studentState.checked && this.studentState.checked.useOfEnglish2a);
+              if (!isChecked && !this.isTeacherMode) return '<div id="preps-score-box" class="feedback-box hidden"></div>';
+              let score = 0;
+              ex.items.forEach(item => {
+                const val = (state[item.id] || "").trim().toLowerCase();
+                if (val === item.prep.toLowerCase() || (item.alt && val === item.alt.toLowerCase())) score++;
+              });
+              return `<div id="preps-score-box" class="feedback-box feedback-info"><strong>Score: ${score} / 14 Prepositions Correct!</strong></div>`;
+            })()}
           </div>
         </div>
       `;
@@ -1966,21 +2039,11 @@
             score++;
           }
         });
-        const box = container.querySelector('#preps-score-box');
-        if (box) {
-          box.classList.remove('hidden');
-          box.innerHTML = `<strong>Score: ${score} / 14 Prepositions Correct!</strong>`;
-          if (score >= 11) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        }
-        this.renderCurrentSlide();
-      });
-
-      container.querySelector('#reveal-preps-btn')?.addEventListener('click', () => {
-        ex.items.forEach(item => {
-          this.studentState.useOfEnglish2a[item.id] = item.prep;
-        });
+        if (score >= 11) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+        this.studentState.checked = this.studentState.checked || {};
+        this.studentState.checked.useOfEnglish2a = true;
         this.saveState();
-        this.renderCurrentSlide();
+        this.updateView();
       });
     }
 
@@ -2007,11 +2070,12 @@
 
             <div class="phrasal-grid">
               ${ex.matching.map(item => {
+                const isChecked3a = !!(this.studentState.checked && this.studentState.checked.useOfEnglish3a);
                 const currentVal = state[item.id] || "";
                 const isMatch = currentVal === item.meaningId;
-                const show = currentVal !== "" || this.isTeacherMode;
+                const show = this.isTeacherMode || isChecked3a;
                 return `
-                  <div class="phrasal-card ${show ? (isMatch || this.isTeacherMode ? 'card-correct' : 'card-incorrect') : ''}">
+                  <div class="phrasal-card ${show ? (isMatch ? 'card-correct' : 'card-incorrect') : ''}">
                     <div class="phrasal-verb-name">
                       <span class="phrasal-num">${item.id}</span>
                       <strong>${item.verb}</strong>
@@ -2026,35 +2090,65 @@
                         <option value="e" ${(this.isTeacherMode ? item.meaningId : currentVal) === 'e' ? 'selected' : ''}>e. compensate</option>
                         <option value="f" ${(this.isTeacherMode ? item.meaningId : currentVal) === 'f' ? 'selected' : ''}>f. examine</option>
                       </select>
-                      ${this.isTeacherMode ? `<span class="answer-pill">[${item.meaningId}] ${item.meaning}</span>` : ''}
+                      ${this.isTeacherMode || (isChecked3a && !isMatch) ? `<span class="answer-pill">[${item.meaningId}] ${item.meaning}</span>` : ''}
                     </div>
                   </div>
                 `;
               }).join('')}
             </div>
+
+            <div class="actions-bar mt-3">
+              <button class="btn btn-success" id="check-phrasal-3a-btn">Check 3a Matching</button>
+              ${(() => {
+                const isChecked3a = !!(this.studentState.checked && this.studentState.checked.useOfEnglish3a);
+                if (!isChecked3a && !this.isTeacherMode) return '';
+                let score = 0;
+                ex.matching.forEach(item => {
+                  if (state[item.id] === item.meaningId) score++;
+                });
+                return `<div class="feedback-box feedback-info"><strong>Score: ${score} / ${ex.matching.length} Matches Correct</strong></div>`;
+              })()}
+            </div>
           </div>
 
-          <!-- 3b: Rewriting Sentences with Phrasal Verbs + Gerunds -->
+          <!-- 3b: Rewriting Sentences with Phrasal Verbs + Gerunds (Interactive) -->
           <div class="phrasal-rewrites-section">
             <div class="section-title-bar">
               <h4>3b. Rewrite using the phrasal verbs in Ex 3a. Use gerunds where possible:</h4>
             </div>
 
             <div class="rewrites-list">
-              ${ex.rewrites.map(rw => `
-                <div class="rewrite-card" onclick="this.querySelector('.rewrite-reveal').classList.toggle('hidden')">
-                  <div class="rw-orig">
-                    <span class="rw-num">${rw.id}.</span>
-                    <span class="rw-text">"${rw.original}"</span>
-                    <span class="rw-target-tag">Target: ${rw.phrasalVerb}</span>
+              ${ex.rewrites.map(rw => {
+                const isChecked3b = !!(this.studentState.checked && this.studentState.checked.useOfEnglish3b);
+                const currentVal = (this.studentState.useOfEnglish3b && this.studentState.useOfEnglish3b[rw.id]) || "";
+                return `
+                  <div class="rewrite-card">
+                    <div class="rw-orig">
+                      <span class="rw-num">${rw.id}.</span>
+                      <span class="rw-text">"${rw.original}"</span>
+                      <span class="rw-target-tag">Target: ${rw.phrasalVerb}</span>
+                    </div>
+                    <div class="rewrite-input-wrap">
+                      <input type="text"
+                        class="rewrite-input"
+                        data-rwid="${rw.id}"
+                        placeholder="Write your rewritten sentence starting with subject..."
+                        value="${this.isTeacherMode ? rw.model : currentVal}" />
+                    </div>
+                    <div class="rewrite-reveal ${this.isTeacherMode || isChecked3b ? '' : 'hidden'}">
+                      → Model Answer: <strong>"${rw.model}"</strong>
+                    </div>
                   </div>
-                  <div class="rewrite-reveal ${this.isTeacherMode ? '' : 'hidden'}">
-                    → Model Answer: <strong>"${rw.model}"</strong>
-                  </div>
-                </div>
-              `).join('')}
+                `;
+              }).join('')}
             </div>
-            <p class="click-hint-text">Tip: Click any sentence above to toggle the model transformation.</p>
+
+            <div class="actions-bar mt-3">
+              <button class="btn btn-success" id="check-rewrites-3b-btn">Check 3b Rewrites</button>
+              ${(this.studentState.checked && this.studentState.checked.useOfEnglish3b) || this.isTeacherMode ? `
+                <div class="feedback-box feedback-info">Review the Cambridge model transformations above against your answers.</div>
+              ` : ''}
+            </div>
           </div>
         </div>
       `;
@@ -2068,12 +2162,43 @@
           this.saveState();
         });
       });
+
+      container.querySelector('#check-phrasal-3a-btn')?.addEventListener('click', () => {
+        let score = 0;
+        const ex = this.data.useOfEnglish.ex3;
+        ex.matching.forEach(item => {
+          if (this.studentState.useOfEnglish3a[item.id] === item.meaningId) score++;
+        });
+        if (score >= 5) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+        this.studentState.checked = this.studentState.checked || {};
+        this.studentState.checked.useOfEnglish3a = true;
+        this.saveState();
+        this.updateView();
+      });
+
+      container.querySelectorAll('.rewrite-input').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const rwid = inp.getAttribute('data-rwid');
+          this.studentState.useOfEnglish3b = this.studentState.useOfEnglish3b || {};
+          this.studentState.useOfEnglish3b[rwid] = e.target.value;
+          this.saveState();
+        });
+      });
+
+      container.querySelector('#check-rewrites-3b-btn')?.addEventListener('click', () => {
+        this.studentState.checked = this.studentState.checked || {};
+        this.studentState.checked.useOfEnglish3b = true;
+        this.sfx.playCorrect();
+        this.saveState();
+        this.updateView();
+      });
     }
 
     // --- SLIDE 13: USE OF ENGLISH - VERB COMPLEMENTATION (EX 4) ---
     getSlide13HTML() {
       const u = this.data.useOfEnglish;
       const ex = u.ex4;
+      const isChecked = !!(this.studentState.checked && this.studentState.checked.useOfEnglish4);
       return `
         <div class="slide slide-grammar animate-fade-in">
           <div class="slide-header">
@@ -2095,9 +2220,11 @@
                   <span class="pattern-num">${item.id}.</span>
                   <div class="pattern-sentence-content">
                     <p class="sentence-text">${this.formatEx4Sentence(item)}</p>
-                    <div class="pattern-rules-tags">
-                      ${item.gaps.map(g => `<span class="rule-chip">Rule: ${g.rule}</span>`).join('')}
-                    </div>
+                    ${this.isTeacherMode || isChecked ? `
+                      <div class="pattern-rules-tags">
+                        ${item.gaps.map(g => `<span class="rule-chip"><strong>Rule:</strong> ${g.rule}</span>`).join(' ')}
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
               `).join('')}
@@ -2105,8 +2232,20 @@
 
             <div class="gapfill-footer">
               <button class="btn btn-success" id="check-ex4-btn">Check All Sentences</button>
-              <button class="btn btn-outline" id="reveal-ex4-btn">Reveal All Verb Forms</button>
-              <div id="ex4-score-box" class="feedback-box hidden"></div>
+              ${(() => {
+                if (!isChecked && !this.isTeacherMode) return '<div id="ex4-score-box" class="feedback-box hidden"></div>';
+                let totalGaps = 0;
+                let score = 0;
+                ex.items.forEach(item => {
+                  item.gaps.forEach((g, idx) => {
+                    totalGaps++;
+                    const key = `${item.id}_${idx}`;
+                    const val = (this.studentState.useOfEnglish4[key] || "").trim().toLowerCase();
+                    if (val === g.correct.toLowerCase()) score++;
+                  });
+                });
+                return `<div id="ex4-score-box" class="feedback-box feedback-info"><strong>Score: ${score} / ${totalGaps} Verbs Correct!</strong></div>`;
+              })()}
             </div>
           </div>
         </div>
@@ -2115,20 +2254,21 @@
 
     formatEx4Sentence(item) {
       let raw = item.sentence;
+      const isChecked = !!(this.studentState.checked && this.studentState.checked.useOfEnglish4);
       item.gaps.forEach((g, idx) => {
         const gapKey = `${item.id}_${idx}`;
         const currentVal = this.studentState.useOfEnglish4[gapKey] || "";
         const isMatch = currentVal.trim().toLowerCase() === g.correct.toLowerCase();
-        const show = currentVal !== "" || this.isTeacherMode;
+        const show = this.isTeacherMode || isChecked;
 
         const inputHTML = `
-          <span class="inline-gap-box ${show ? (isMatch || this.isTeacherMode ? 'gap-ok' : 'gap-err') : ''}">
+          <span class="inline-gap-box ${show ? (isMatch ? 'gap-ok' : 'gap-err') : ''}">
             <input type="text"
               class="ex4-input"
               data-gapkey="${gapKey}"
               value="${this.isTeacherMode ? g.correct : currentVal}"
               placeholder="(${g.base})" />
-            ${this.isTeacherMode ? `<span class="key-tooltip">${g.correct}</span>` : ''}
+            ${this.isTeacherMode || (isChecked && !isMatch) ? `<span class="key-tooltip">${g.correct}</span>` : ''}
           </span>
         `;
         raw = raw.replace(`[${g.correct}]`, inputHTML);
@@ -2159,24 +2299,11 @@
           });
         });
 
-        const box = container.querySelector('#ex4-score-box');
-        if (box) {
-          box.classList.remove('hidden');
-          box.innerHTML = `<strong>Score: ${score} / ${totalGaps} Verbs Correct!</strong>`;
-          if (score >= totalGaps - 2) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        }
-        this.renderCurrentSlide();
-      });
-
-      container.querySelector('#reveal-ex4-btn')?.addEventListener('click', () => {
-        ex.items.forEach(item => {
-          item.gaps.forEach((g, idx) => {
-            const key = `${item.id}_${idx}`;
-            this.studentState.useOfEnglish4[key] = g.correct;
-          });
-        });
+        if (score >= totalGaps - 2) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+        this.studentState.checked = this.studentState.checked || {};
+        this.studentState.checked.useOfEnglish4 = true;
         this.saveState();
-        this.renderCurrentSlide();
+        this.updateView();
       });
     }
 
@@ -2185,6 +2312,7 @@
       const u = this.data.useOfEnglish;
       const ex = u.ex5;
       const state = this.studentState.useOfEnglish5;
+      const isChecked = !!(this.studentState.checked && this.studentState.checked.useOfEnglish5);
       return `
         <div class="slide slide-grammar animate-fade-in">
           <div class="slide-header">
@@ -2213,9 +2341,9 @@
                 const isMatch = Array.isArray(r.correct)
                   ? r.correct.some(c => c.toLowerCase() === currentVal)
                   : r.correct.toLowerCase() === currentVal;
-                const show = currentVal !== "" || this.isTeacherMode;
+                const show = this.isTeacherMode || isChecked;
                 return `
-                  <div class="rule-poster-item ${show ? (isMatch || this.isTeacherMode ? 'rule-correct' : 'rule-incorrect') : ''}">
+                  <div class="rule-poster-item ${show ? (isMatch ? 'rule-correct' : 'rule-incorrect') : ''}">
                     <span class="rule-lead">${r.lead}</span>
                     <div class="rule-input-wrap">
                       <input type="text"
@@ -2223,10 +2351,10 @@
                         data-id="${r.id}"
                         value="${this.isTeacherMode ? (r.display || r.correct) : currentVal}"
                         placeholder="..." />
-                      ${this.isTeacherMode ? `<span class="rule-key">[${r.display || r.correct}]</span>` : ''}
+                      ${this.isTeacherMode || (isChecked && !isMatch) ? `<span class="rule-key">[${r.display || r.correct}]</span>` : ''}
                     </div>
                     <span class="rule-trail">${r.trail}</span>
-                    <span class="rule-exp-tag">Rule: ${r.rule}</span>
+                    ${this.isTeacherMode || isChecked ? `<span class="rule-exp-tag"><strong>Rule:</strong> ${r.rule}</span>` : ''}
                   </div>
                 `;
               }).join('')}
@@ -2234,8 +2362,18 @@
 
             <div class="poster-footer-bar">
               <button class="btn btn-primary" id="check-rules-btn">Validate 6 Rules</button>
-              <button class="btn btn-outline" id="reveal-rules-btn">Reveal Solutions</button>
-              <div id="rules-score-badge" class="score-badge-large hidden"></div>
+              ${(() => {
+                if (!isChecked && !this.isTeacherMode) return '<div id="rules-score-badge" class="score-badge-large hidden"></div>';
+                let score = 0;
+                ex.rules.forEach(r => {
+                  const val = (state[r.id] || "").trim().toLowerCase();
+                  const match = Array.isArray(r.correct)
+                    ? r.correct.some(c => c.toLowerCase() === val)
+                    : r.correct.toLowerCase() === val;
+                  if (match) score++;
+                });
+                return `<div id="rules-score-badge" class="score-badge-large">${score} / 6 Rules Correct!</div>`;
+              })()}
             </div>
           </div>
         </div>
@@ -2263,21 +2401,11 @@
           if (match) score++;
         });
 
-        const badge = container.querySelector('#rules-score-badge');
-        if (badge) {
-          badge.classList.remove('hidden');
-          badge.textContent = `${score} / 6 Rules Correct!`;
-          if (score === 6) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        }
-        this.renderCurrentSlide();
-      });
-
-      container.querySelector('#reveal-rules-btn')?.addEventListener('click', () => {
-        ex.rules.forEach(r => {
-          this.studentState.useOfEnglish5[r.id] = Array.isArray(r.correct) ? r.correct[0] : r.correct;
-        });
+        if (score === 6) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+        this.studentState.checked = this.studentState.checked || {};
+        this.studentState.checked.useOfEnglish5 = true;
         this.saveState();
-        this.renderCurrentSlide();
+        this.updateView();
       });
     }
 
@@ -2367,14 +2495,17 @@
             listeningPart4Task2: {},
             listeningPart2Gaps: {},
             readingMC: {},
+            synonymsMiserable: ["", "", ""],
             everydayEnglish: {},
             useOfEnglish1a: {},
             useOfEnglish2a: {},
             useOfEnglish3a: {},
+            useOfEnglish3b: {},
             useOfEnglish4: {},
-            useOfEnglish5: {}
+            useOfEnglish5: {},
+            checked: {}
           };
-          this.renderCurrentSlide();
+          this.updateView();
           alert("Progress reset successfully.");
         }
       });
