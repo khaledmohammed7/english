@@ -260,6 +260,7 @@ Google has penetrated popular culture so deeply that, like Xerox or Hoover befor
           id: "achieve-b",
           label: "Photo B: Learning to Ride a Bicycle",
           caption: "A supportive father gently coaching his smiling young daughter riding a bicycle with a safety helmet.",
+          imageUrl: "https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=800&q=80",
           successType: "Developmental / Parental Milestone",
           happinessFactor: "Overcoming fear, newfound childhood freedom, parental pride",
           effortRequired: "Patience, overcoming scrapes and falls, confidence building"
@@ -268,11 +269,29 @@ Google has penetrated popular culture so deeply that, like Xerox or Hoover befor
           id: "achieve-c",
           label: "Photo C: Sinking a Winning Putt",
           caption: "A focused golfer in classic athletic clothing successfully watching a decisive ball roll into the golf hole.",
+          imageUrl: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=800&q=80",
           successType: "Sporting & Competitive Excellence",
           happinessFactor: "Thrill of victory, personal mastery, adrenaline surge",
           effortRequired: "Intense physical training, mental discipline, precision practice"
         }
-      ]
+      ],
+      modelAnswer: {
+        comparingPhotos: "Photo A (First Home) & Photo B (Riding a Bike)",
+        candidateRole: "Candidate A (1-minute turn)",
+        speechText: "Both pictures illustrate significant personal achievements, though they occur at vastly different stages in life. In the first picture, we see a young couple who have evidently just purchased their first home. This represents a major domestic milestone that typically requires years of financial discipline, saving for a deposit, and career sacrifices. In stark contrast, the second image portrays a much younger child learning to cycle with her father's encouragement. While this is a childhood developmental milestone rather than a financial one, it is no less profound. Regarding who might be feeling the happiest, I'd say the child probably experiences the purest, uninhibited joy—a sudden rush of freedom and triumph having overcome the fear of falling. On the other hand, the couple's happiness is likely tinged with immense relief after what was undoubtedly a protracted and stressful property transaction.",
+        keyPhrases: [
+          "Both pictures illustrate significant personal achievements...",
+          "In stark contrast, the second image portrays...",
+          "While this is a ..., it is no less profound",
+          "Regarding who might be feeling the happiest, I'd say...",
+          "On the other hand, ... is likely tinged with immense relief"
+        ],
+        partnerModel: {
+          role: "Candidate B (30-second follow-up)",
+          question: "Who do you think may have worked the hardest to achieve success?",
+          speechText: "In my opinion, it would definitely be the couple in Photo A. Purchasing real estate in today's economic climate demands years of sustained dedication, relentless budgeting, and long working hours. While mastering cycling takes patience and determination, it usually occurs over days or weeks, whereas buying a house represents the culmination of a decade of hard graft."
+        }
+      }
     },
 
     taskCelebrations: {
@@ -290,6 +309,7 @@ Google has penetrated popular culture so deeply that, like Xerox or Hoover befor
           id: "celeb-a",
           label: "Photo A: Child's Birthday Party",
           caption: "A delighted young child blowing out candles on a colorful birthday cake with joyful anticipation.",
+          imageUrl: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=800&q=80",
           occasionType: "Personal Birthday Milestone",
           meaning: "Pure joy, excitement of growing up, being the center of loving attention",
           nextDevelopment: "Opening presents, party games, singing with friends and family"
@@ -298,6 +318,7 @@ Google has penetrated popular culture so deeply that, like Xerox or Hoover befor
           id: "celeb-b",
           label: "Photo B: University Graduation",
           caption: "A proud young woman in traditional academic cap and gown holding her rolled degree certificate.",
+          imageUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80",
           occasionType: "Academic Rite of Passage",
           meaning: "Culmination of years of hard study, transition to professional adulthood",
           nextDevelopment: "Ceremonial cap toss, celebratory lunch with parents, job hunting"
@@ -306,11 +327,28 @@ Google has penetrated popular culture so deeply that, like Xerox or Hoover befor
           id: "celeb-c",
           label: "Photo C: Golden Anniversary",
           caption: "An affectionate elderly couple smiling warmly as they read an anniversary card or family letter together.",
+          imageUrl: "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=800&q=80",
           occasionType: "Lifelong Partnership / Golden Anniversary",
           meaning: "Enduring love, reflection on a shared lifetime, deep gratitude",
           nextDevelopment: "A quiet family gathering with grandchildren, reminiscing over old photo albums"
         }
-      ]
+      ],
+      modelAnswer: {
+        comparingPhotos: "Photo B (Graduation) & Photo C (Golden Anniversary)",
+        candidateRole: "Candidate B (1-minute turn)",
+        speechText: "Both photographs capture celebratory occasions marked by pride and nostalgia, but the underlying significance of each event is quite distinctive. The first image portrays a young university graduate, which represents an academic rite of passage and the doorway into professional life. She has reached the end of intense scholarly effort and is looking forward with optimism to her future career. In contrast, the couple in the second photograph are celebrating a lifelong milestone, perhaps their golden wedding anniversary. For them, the occasion represents decades of shared commitment, weathering life's storms together, and quiet contentment. While the graduate's celebration is exhilarating and forward-looking, the anniversary is deeply reflective, characterized by gratitude and fond memories.",
+        keyPhrases: [
+          "Both photographs capture celebratory occasions...",
+          "In contrast, the couple in the second photograph...",
+          "While the graduate's celebration is exhilarating and forward-looking...",
+          "For them, the occasion represents decades of shared commitment..."
+        ],
+        partnerModel: {
+          role: "Candidate A (30-second follow-up)",
+          question: "How do you think each celebration might develop?",
+          speechText: "I imagine the graduation will culminate in a jubilant gathering with fellow students, perhaps throwing their mortarboards into the air, followed by a formal dinner with family. On the other hand, the anniversary celebration is likely to be much more intimate—perhaps a cozy family reunion with children and grandchildren sharing old memories."
+        }
+      }
     },
 
     usefulLanguage: {

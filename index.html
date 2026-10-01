@@ -95,28 +95,65 @@
     <!-- Cambridge Exam Speaking Timer Modal -->
     <div class="timer-modal" id="timer-modal" role="dialog" aria-modal="true" aria-labelledby="timer-modal-title">
       <div class="timer-modal-content">
-        <h3 id="timer-modal-title">Speaking Exam Countdown</h3>
-        <p class="text-muted" style="font-size: 13px; margin-top: 4px;">Cambridge C1 Advanced Speaking Part 2</p>
+        <div class="timer-modal-header">
+          <div>
+            <h3 id="timer-modal-title">Speaking Exam Timer</h3>
+            <p class="text-muted" style="font-size: 13px; margin-top: 2px;">Editable countdown for Cambridge C1 Speaking</p>
+          </div>
+          <button class="timer-close-x" id="timer-modal-close-x" title="Close Timer">&times;</button>
+        </div>
 
-        <!-- SVG Circular Progress Animation -->
+        <!-- SVG Circular Progress Animation with Editable Inputs -->
         <div class="timer-visual-circle">
           <svg class="timer-svg" viewBox="0 0 100 100">
             <circle class="timer-track" cx="50" cy="50" r="45"></circle>
             <circle class="timer-ring" id="timer-progress-ring" cx="50" cy="50" r="45"></circle>
           </svg>
           <div class="timer-inner-text">
-            <span class="timer-time-display" id="timer-display">01:00</span>
+            <!-- Editable Time Inputs -->
+            <div class="timer-time-editor" title="Click to type custom minutes and seconds">
+              <input type="number" id="timer-input-mins" class="timer-digit-input" min="0" max="59" value="01" aria-label="Minutes" />
+              <span class="timer-colon">:</span>
+              <input type="number" id="timer-input-secs" class="timer-digit-input" min="0" max="59" value="00" aria-label="Seconds" />
+            </div>
+            <span class="timer-edit-hint">Click numbers to edit</span>
             <span class="timer-status" id="timer-status">Ready (60s)</span>
           </div>
         </div>
 
-        <div class="timer-presets-row">
-          <button class="btn btn-sm btn-outline" id="timer-preset-60">1:00 Min (Candidate Turn)</button>
-          <button class="btn btn-sm btn-outline" id="timer-preset-120">2:00 Min (Collaborative)</button>
+        <!-- Quick Stepper Adjustment Buttons (-15s, +15s, +30s, +1m) -->
+        <div class="timer-adjust-row">
+          <span class="adjust-label">Quick Adjust:</span>
+          <div class="adjust-buttons-group">
+            <button class="btn-adjust" id="timer-adj-minus-15" title="Subtract 15 seconds">-15s</button>
+            <button class="btn-adjust" id="timer-adj-plus-15" title="Add 15 seconds">+15s</button>
+            <button class="btn-adjust" id="timer-adj-plus-30" title="Add 30 seconds">+30s</button>
+            <button class="btn-adjust" id="timer-adj-plus-60" title="Add 1 minute">+1m</button>
+          </div>
         </div>
 
+        <!-- Official Cambridge Exam Presets -->
+        <div class="timer-presets-section">
+          <span class="presets-title">Official Exam Presets:</span>
+          <div class="timer-presets-row">
+            <button class="btn-preset" id="timer-preset-30" data-seconds="30">
+              <strong>30s</strong> Partner Follow-up
+            </button>
+            <button class="btn-preset active" id="timer-preset-60" data-seconds="60">
+              <strong>1:00</strong> Part 2 Long Turn
+            </button>
+            <button class="btn-preset" id="timer-preset-120" data-seconds="120">
+              <strong>2:00</strong> Part 3 Discussion
+            </button>
+            <button class="btn-preset" id="timer-preset-180" data-seconds="180">
+              <strong>3:00</strong> Extended Task
+            </button>
+          </div>
+        </div>
+
+        <!-- Timer Action Controls -->
         <div class="timer-actions-row">
-          <button class="btn btn-primary" id="timer-start-btn">Start</button>
+          <button class="btn btn-primary" id="timer-start-btn">Start Countdown</button>
           <button class="btn btn-outline" id="timer-pause-btn">Pause</button>
           <button class="btn btn-ghost" id="timer-reset-btn">Reset</button>
           <button class="btn btn-ghost" id="timer-modal-close">Close</button>

@@ -171,7 +171,7 @@
     }
   }
 
-  // --- SPEAKING EXAM COUNTDOWN TIMER ---
+  // --- SPEAKING EXAM COUNTDOWN TIMER (EDITABLE) ---
   class ExamTimer {
     constructor(soundEngine) {
       this.sfx = soundEngine;
@@ -179,16 +179,65 @@
       this.timeLeft = 60;
       this.interval = null;
       this.isRunning = false;
-      this.displayEl = document.getElementById('timer-display');
       this.circleEl = document.getElementById('timer-progress-ring');
       this.statusBadge = document.getElementById('timer-status');
+      this.minInput = document.getElementById('timer-input-mins');
+      this.secInput = document.getElementById('timer-input-secs');
+      this.initInputListeners();
+    }
+
+    initInputListeners() {
+      const handleInput = () => {
+        if (this.isRunning) this.pause();
+        const mins = parseInt(this.minInput?.value, 10) || 0;
+        const secs = parseInt(this.secInput?.value, 10) || 0;
+        const total = Math.max(5, Math.min(3599, mins * 60 + secs));
+        this.duration = total;
+        this.timeLeft = total;
+        this.updateDisplay(false);
+        if (this.statusBadge) {
+          this.statusBadge.textContent = `Ready (${this.duration}s)`;
+          this.statusBadge.className = "timer-status";
+        }
+        this.updatePresetButtons();
+      };
+
+      [this.minInput, this.secInput].forEach(inp => {
+        if (!inp) return;
+        inp.addEventListener('focus', () => inp.select());
+        inp.addEventListener('input', handleInput);
+        inp.addEventListener('change', () => {
+          handleInput();
+          this.updateDisplay(true);
+        });
+        inp.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            inp.blur();
+            this.start();
+          }
+        });
+      });
     }
 
     setDuration(seconds) {
       this.reset();
-      this.duration = seconds;
-      this.timeLeft = seconds;
-      this.updateDisplay();
+      this.duration = Math.max(5, Math.min(3599, seconds));
+      this.timeLeft = this.duration;
+      this.updateDisplay(true);
+      this.updatePresetButtons();
+    }
+
+    adjustTime(delta) {
+      this.sfx.playClick();
+      const next = Math.max(5, Math.min(3599, this.duration + delta));
+      this.setDuration(next);
+    }
+
+    updatePresetButtons() {
+      document.querySelectorAll('.btn-preset').forEach(btn => {
+        const s = parseInt(btn.getAttribute('data-seconds'), 10);
+        btn.classList.toggle('active', s === this.duration);
+      });
     }
 
     start() {
@@ -199,9 +248,10 @@
         this.statusBadge.textContent = "Speaking Time Active";
         this.statusBadge.className = "timer-status active";
       }
+      this.updateSlideButtons();
       this.interval = setInterval(() => {
         this.timeLeft--;
-        this.updateDisplay();
+        this.updateDisplay(true);
 
         if (this.timeLeft === 10) {
           this.sfx.playClick();
@@ -210,7 +260,7 @@
         if (this.timeLeft <= 0) {
           this.pause();
           this.timeLeft = 0;
-          this.updateDisplay();
+          this.updateDisplay(true);
           this.sfx.playBuzzer();
           if (this.statusBadge) {
             this.statusBadge.textContent = "Time Expired";
@@ -228,25 +278,52 @@
         this.statusBadge.textContent = "Paused";
         this.statusBadge.className = "timer-status paused";
       }
+      this.updateSlideButtons();
     }
 
     reset() {
       this.pause();
       this.timeLeft = this.duration;
-      this.updateDisplay();
+      this.updateDisplay(true);
       if (this.statusBadge) {
         this.statusBadge.textContent = `Ready (${this.duration}s)`;
         this.statusBadge.className = "timer-status";
       }
+      this.updateSlideButtons();
     }
 
-    updateDisplay() {
+    updateSlideButtons() {
+      document.querySelectorAll('.btn-slide-timer-toggle').forEach(btn => {
+        btn.textContent = this.isRunning ? "Pause Timer" : "Start Timer";
+        btn.className = this.isRunning ? "btn btn-outline btn-sm btn-slide-timer-toggle" : "btn btn-primary btn-sm btn-slide-timer-toggle";
+      });
+    }
+
+    updateDisplay(updateInputs = true) {
       const mins = Math.floor(this.timeLeft / 60);
       const secs = this.timeLeft % 60;
-      const formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-      if (this.displayEl) {
-        this.displayEl.textContent = formatted;
+      const formattedMins = mins.toString().padStart(2, '0');
+      const formattedSecs = secs.toString().padStart(2, '0');
+      const formatted = `${formattedMins}:${formattedSecs}`;
+
+      if (updateInputs) {
+        if (this.minInput && document.activeElement !== this.minInput) {
+          this.minInput.value = formattedMins;
+        }
+        if (this.secInput && document.activeElement !== this.secInput) {
+          this.secInput.value = formattedSecs;
+        }
       }
+
+      document.querySelectorAll('.slide-timer-preview, #slide-timer-preview').forEach(el => {
+        el.textContent = formatted;
+      });
+
+      const navBtn = document.querySelector('#timer-modal-toggle .btn-label');
+      if (navBtn) {
+        navBtn.textContent = `Exam Timer (${formatted})`;
+      }
+
       if (this.circleEl) {
         const perimeter = 2 * Math.PI * 45;
         const offset = perimeter - (this.timeLeft / this.duration) * perimeter;
@@ -283,6 +360,10 @@
         useOfEnglish3b: {},
         useOfEnglish4: {},
         useOfEnglish5: {},
+        selectedPhotosAchievements: ["achieve-a", "achieve-b"],
+        selectedPhotosCelebrations: ["celeb-b", "celeb-c"],
+        pollVotes: { A: 42, B: 38, C: 35, D: 21, E: 14, F: 19 },
+        pollUserVoted: null,
         checked: {}
       };
 
@@ -323,6 +404,94 @@
         this.renderWorkbook();
         if (bookContainer && scrollPos) bookContainer.scrollTop = scrollPos;
         if (winScrollPos) window.scrollTo(0, winScrollPos);
+      }
+    }
+
+    isItemChecked(exKey, itemId) {
+      if (this.isTeacherMode) return true;
+      if (!this.studentState.checked || !this.studentState.checked[exKey]) return false;
+      const c = this.studentState.checked[exKey];
+      if (c === true) return true;
+      if (typeof c === 'object') return !!c[itemId];
+      return false;
+    }
+
+    hasCheckedAny(exKey) {
+      if (this.isTeacherMode) return true;
+      if (!this.studentState.checked || !this.studentState.checked[exKey]) return false;
+      const c = this.studentState.checked[exKey];
+      if (c === true) return true;
+      if (typeof c === 'object') return Object.keys(c).length > 0;
+      return false;
+    }
+
+    setItemChecked(exKey, itemId, val = true) {
+      this.studentState.checked = this.studentState.checked || {};
+      if (typeof this.studentState.checked[exKey] !== 'object' || this.studentState.checked[exKey] === null) {
+        this.studentState.checked[exKey] = {};
+      }
+      this.studentState.checked[exKey][itemId] = val;
+      this.saveState();
+      this.updateView();
+    }
+
+    setAllChecked(exKey, val = true) {
+      this.studentState.checked = this.studentState.checked || {};
+      this.studentState.checked[exKey] = val;
+      this.saveState();
+      this.updateView();
+    }
+
+    togglePhotoSelection(taskKey, photoId) {
+      this.studentState[taskKey] = this.studentState[taskKey] || [];
+      const list = this.studentState[taskKey];
+      const idx = list.indexOf(photoId);
+      if (idx > -1) {
+        if (list.length > 1) {
+          list.splice(idx, 1);
+        }
+      } else {
+        if (list.length >= 2) {
+          list.shift();
+        }
+        list.push(photoId);
+      }
+      this.sfx.playClick();
+      this.saveState();
+      this.updateView();
+    }
+
+    votePoll(target) {
+      this.sfx.playClick();
+      if (typeof target === 'string') {
+        const code = target;
+        if (this.studentState.pollUserVoted === code) return;
+        if (!this.studentState.pollVotes) {
+          this.studentState.pollVotes = { A: 42, B: 38, C: 35, D: 21, E: 14, F: 19 };
+        }
+        if (this.studentState.pollUserVoted) {
+          this.studentState.pollVotes[this.studentState.pollUserVoted] = Math.max(0, (this.studentState.pollVotes[this.studentState.pollUserVoted] || 1) - 1);
+        }
+        this.studentState.pollVotes[code] = (this.studentState.pollVotes[code] || 0) + 1;
+        this.studentState.pollUserVoted = code;
+        this.saveState();
+        this.updateView();
+      } else if (target && target.nodeType) {
+        const cardEl = target;
+        cardEl.classList.toggle('voted');
+        const countEl = cardEl.querySelector('.poll-count');
+        const fillEl = cardEl.querySelector('.poll-meter-fill');
+        if (countEl && fillEl) {
+          let num = parseInt(countEl.textContent, 10);
+          if (cardEl.classList.contains('voted')) {
+            num++;
+            fillEl.style.width = `${Math.min(100, num * 2)}%`;
+          } else {
+            num = Math.max(0, num - 1);
+            fillEl.style.width = `${Math.min(100, num * 2)}%`;
+          }
+          countEl.textContent = `${num} votes`;
+        }
       }
     }
 
@@ -472,10 +641,24 @@
       document.getElementById('timer-start-btn')?.addEventListener('click', () => this.timer.start());
       document.getElementById('timer-pause-btn')?.addEventListener('click', () => this.timer.pause());
       document.getElementById('timer-reset-btn')?.addEventListener('click', () => this.timer.reset());
-      document.getElementById('timer-preset-60')?.addEventListener('click', () => this.timer.setDuration(60));
-      document.getElementById('timer-preset-120')?.addEventListener('click', () => this.timer.setDuration(120));
       document.getElementById('timer-modal-toggle')?.addEventListener('click', () => this.toggleTimerModal());
       document.getElementById('timer-modal-close')?.addEventListener('click', () => this.toggleTimerModal());
+      document.getElementById('timer-modal-close-x')?.addEventListener('click', () => this.toggleTimerModal());
+
+      document.getElementById('timer-adj-minus-15')?.addEventListener('click', () => this.timer.adjustTime(-15));
+      document.getElementById('timer-adj-plus-15')?.addEventListener('click', () => this.timer.adjustTime(15));
+      document.getElementById('timer-adj-plus-30')?.addEventListener('click', () => this.timer.adjustTime(30));
+      document.getElementById('timer-adj-plus-60')?.addEventListener('click', () => this.timer.adjustTime(60));
+
+      document.querySelectorAll('.btn-preset').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const secs = parseInt(btn.getAttribute('data-seconds'), 10);
+          if (secs) {
+            this.sfx.playClick();
+            this.timer.setDuration(secs);
+          }
+        });
+      });
 
       window.addEventListener('beforeunload', () => this.tts.stop());
     }
@@ -610,46 +793,284 @@
       }
     }
 
-    // --- SLIDE 1: WELCOME & ROADMAP ---
+    // --- SLIDE 1: CREATIVE EDITORIAL COVER PAGE & ROADMAP ---
     getSlide1HTML() {
       const u = this.data.unitInfo;
       return `
-        <div class="slide slide-hero animate-fade-in">
-          <div class="hero-badge-row">
-            <span class="badge badge-accent">Cambridge English: Advanced (CAE)</span>
-            <span class="badge badge-primary">CEFR Level C1</span>
-            <span class="badge badge-outline">${u.pages}</span>
-          </div>
-
-          <h1 class="hero-title">Unit ${u.unitNumber}: ${u.title}</h1>
-          <p class="hero-subtitle">${u.subtitle}</p>
-
-          <div class="roadmap-grid">
-            ${u.sections.map((sec, idx) => `
-              <div class="roadmap-card card-interactive" onclick="window.app.goToSlide(${[2, 4, 7, 10][idx]})">
-                <div class="card-icon-bubble">${sec.icon}</div>
-                <div class="card-body">
-                  <span class="card-page">${sec.page}</span>
-                  <h3 class="card-title">${sec.title}</h3>
-                  <p class="card-desc">Interactive exercises, audio recordings, auto-grading, and exam tips.</p>
-                </div>
-                <div class="card-arrow">→</div>
+        <div class="slide slide-cover-page animate-fade-in">
+          <!-- Top Bar: Academic Heraldry & Metadata Strip -->
+          <header class="cover-top-bar">
+            <div class="cover-brand-lockup">
+              <div class="cover-crest-wrap">
+                <svg class="cover-crest-svg" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Cambridge Academic Emblem">
+                  <rect width="36" height="36" rx="6" fill="#0A2540"/>
+                  <path d="M18 5L28 10V18C28 24.5 23.7 30.2 18 32C12.3 30.2 8 24.5 8 18V10L18 5Z" fill="#C59B27" fill-opacity="0.18" stroke="#C59B27" stroke-width="1.6"/>
+                  <path d="M13 14H23M13 18H23M13 22H19" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
+                  <circle cx="18" cy="10.5" r="1.5" fill="#C59B27"/>
+                </svg>
               </div>
-            `).join('')}
+              <div class="cover-brand-meta">
+                <span class="cover-org-title">Cambridge University Press &amp; Assessment</span>
+                <span class="cover-course-label">English C1 Advanced (CAE) &bull; Official Digital Courseware</span>
+              </div>
+            </div>
+
+            <div class="cover-meta-strip">
+              <span class="cover-meta-badge cover-badge-gold">Academic Edition 2026</span>
+              <span class="cover-meta-badge cover-badge-live">
+                <span class="live-pulse-dot"></span> Interactive Deck
+              </span>
+              <span class="cover-meta-badge cover-badge-c1">CEFR C1 &bull; 180&ndash;199 Scale</span>
+            </div>
+          </header>
+
+          <!-- Hero Split Showcase -->
+          <div class="cover-hero-grid">
+            <!-- Left: Editorial Manifesto & Controls -->
+            <div class="cover-hero-content">
+              <div class="cover-unit-kicker">
+                <span class="kicker-pill">UNIT 01</span>
+                <span class="kicker-rule"></span>
+                <span class="kicker-pages">Student's Book &bull; Pages 14&ndash;18</span>
+              </div>
+
+              <div class="cover-headline-wrap">
+                <h1 class="cover-headline">
+                  <span class="headline-part-1">HAPPINESS</span>
+                  <span class="headline-amp">&amp;</span>
+                  <span class="headline-part-2">SUCCESS</span>
+                </h1>
+                <div class="headline-accent-line"></div>
+              </div>
+
+              <p class="cover-synopsis">
+                An advanced communicative journey into the psychology of human flourishing, life milestones, and linguistic sophistication. Master Cambridge C1 Listening, Speaking photo comparisons, psychological reading essays, and subtle Gerund vs. Infinitive nuances.
+              </p>
+
+              <!-- Live Syllabus Metric Ticker -->
+              <div class="cover-stats-row">
+                <div class="cover-stat-box">
+                  <span class="stat-number">04</span>
+                  <span class="stat-label">Core Papers</span>
+                </div>
+                <div class="cover-stat-box">
+                  <span class="stat-number">08</span>
+                  <span class="stat-label">Audio Tracks</span>
+                </div>
+                <div class="cover-stat-box">
+                  <span class="stat-number">06</span>
+                  <span class="stat-label">Photo Scenarios</span>
+                </div>
+                <div class="cover-stat-box">
+                  <span class="stat-number">100%</span>
+                  <span class="stat-label">Interactive</span>
+                </div>
+              </div>
+
+              <!-- Call to Action Buttons -->
+              <div class="cover-cta-row">
+                <button class="btn-cover-primary" onclick="window.app.goToSlide(2)" title="Start Lesson Presentation at Slide 2">
+                  <span>Start Lesson Presentation</span>
+                  <span class="btn-arrow">&rarr;</span>
+                </button>
+                <button class="btn-cover-secondary" onclick="window.app.switchView('workbook')" title="Open Digital Textbook Workbook Mode">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                  </svg>
+                  <span>Digital Workbook</span>
+                </button>
+                <button class="btn-cover-timer" onclick="window.app.timer.open()" title="Launch Speaking Exam Timer">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                  <span>Speaking Clock (60s)</span>
+                </button>
+              </div>
+
+              <!-- Quick Jump Pill Row -->
+              <div class="cover-quick-nav">
+                <span class="quick-nav-label">Direct Slide Shortcuts:</span>
+                <div class="quick-nav-chips">
+                  <button class="quick-chip" onclick="window.app.goToSlide(2)">P.14 Listening (Part 4)</button>
+                  <button class="quick-chip" onclick="window.app.goToSlide(3)">P.14 Google Monologue</button>
+                  <button class="quick-chip" onclick="window.app.goToSlide(4)">P.15 Speaking: Achievements</button>
+                  <button class="quick-chip" onclick="window.app.goToSlide(5)">P.15 Speaking: Celebrations</button>
+                  <button class="quick-chip" onclick="window.app.goToSlide(7)">P.16 Reading: Life's Good!</button>
+                  <button class="quick-chip" onclick="window.app.goToSlide(10)">P.18 Grammar: Gerunds</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Visual Artwork Stage & Floating Glass Overlays -->
+            <div class="cover-art-stage">
+              <div class="cover-art-container">
+                <img 
+                  src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1000&q=85" 
+                  alt="Diverse university students celebrating academic success" 
+                  class="cover-main-img" 
+                  onerror="this.src='https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1000&q=85'"
+                />
+                <div class="cover-img-gradient-overlay"></div>
+
+                <!-- Floating Card 1: Native UK Audio Equalizer (Top-Left) -->
+                <div class="floating-glass-card glass-audio-card" title="Native audio recordings with authentic UK accents">
+                  <div class="eq-bars-visual" aria-hidden="true">
+                    <span class="eq-bar eq-bar-1"></span>
+                    <span class="eq-bar eq-bar-2"></span>
+                    <span class="eq-bar eq-bar-3"></span>
+                    <span class="eq-bar eq-bar-4"></span>
+                  </div>
+                  <div>
+                    <span class="glass-card-title">Native Audio Engine</span>
+                    <span class="glass-card-sub">5 Extracts &bull; Multiple Matching</span>
+                  </div>
+                </div>
+
+                <!-- Floating Card 2: Audio Quote Snippet (Top-Right) -->
+                <div class="floating-glass-card glass-quote-card">
+                  <span>&ldquo;Tears of sheer joy... moments like that make everything worthwhile.&rdquo;</span>
+                  <span class="glass-quote-attrib">Speaker 2 &bull; Maternity Nurse</span>
+                </div>
+
+                <!-- Floating Card 3: CEFR C1 Benchmark (Bottom-Left) -->
+                <div class="floating-glass-card glass-c1-card">
+                  <div class="c1-seal-icon" aria-hidden="true">&check;</div>
+                  <div>
+                    <span class="glass-card-title">CEFR Level C1</span>
+                    <span class="glass-card-sub">Target Score: 180&ndash;199</span>
+                  </div>
+                </div>
+
+                <!-- Floating Card 4: Speaking Exam Clock (Bottom-Right) -->
+                <div class="floating-glass-card glass-clock-card" onclick="window.app.timer.open()" title="Click to open the speaking timer">
+                  <div class="glass-clock-digits">01:00</div>
+                  <div>
+                    <span class="glass-card-title">Speaking Clock</span>
+                    <span class="glass-card-sub">Part 2 &bull; 60s Monologue</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="hero-controls-bar">
-            <button class="btn btn-primary btn-lg" onclick="window.app.goToSlide(2)">
-              Start Lesson Presentation →
-            </button>
-            <button class="btn btn-outline btn-lg" onclick="window.app.switchView('workbook')">
-              View Full Interactive Workbook
-            </button>
+          <!-- Section 3: Four Curriculum Roadmap Cards -->
+          <div class="cover-curriculum-section">
+            <div class="curriculum-section-header">
+              <div>
+                <span class="curriculum-kicker">Curriculum Architecture</span>
+                <h2 class="curriculum-title">The Four Core Exam Pillars of Unit 1</h2>
+              </div>
+              <span class="badge badge-outline">Complete C1 Syllabus Coverage</span>
+            </div>
+
+            <div class="curriculum-grid">
+              <!-- Pillar 1: Listening Part 4 -->
+              <div class="curriculum-card card-mod-1" onclick="window.app.goToSlide(2)">
+                <div>
+                  <div class="card-top-meta">
+                    <span class="curriculum-page-badge">Page 14</span>
+                    <span class="curriculum-paper-tag">Paper 3</span>
+                  </div>
+                  <h3 class="curriculum-card-title">Listening: Part 4 Multiple Matching</h3>
+                  <p class="curriculum-card-desc">
+                    5 candid extracts covering life milestones. Concurrent Task 1 (identifying speakers) &amp; Task 2 (life events) at natural native speed.
+                  </p>
+                  <div class="curriculum-tags-strip">
+                    <span class="curriculum-tag">5 Speakers</span>
+                    <span class="curriculum-tag">Dual Tasks</span>
+                    <span class="curriculum-tag">Auto-Grading</span>
+                  </div>
+                </div>
+                <div class="curriculum-card-action">
+                  <span>Enter Listening Lab</span>
+                  <span class="card-arrow">&rarr;</span>
+                </div>
+              </div>
+
+              <!-- Pillar 2: Speaking Part 2 -->
+              <div class="curriculum-card card-mod-2" onclick="window.app.goToSlide(4)">
+                <div>
+                  <div class="card-top-meta">
+                    <span class="curriculum-page-badge">Page 15</span>
+                    <span class="curriculum-paper-tag">Paper 4</span>
+                  </div>
+                  <h3 class="curriculum-card-title">Speaking: Part 2 Long Turn Monologue</h3>
+                  <p class="curriculum-card-desc">
+                    Comparative analysis of achievements and celebrations. 1-minute live timer, speculative language, and C1 Benchmark audio models.
+                  </p>
+                  <div class="curriculum-tags-strip">
+                    <span class="curriculum-tag">6 Photos</span>
+                    <span class="curriculum-tag">60s Live Timer</span>
+                    <span class="curriculum-tag">Audio Model</span>
+                  </div>
+                </div>
+                <div class="curriculum-card-action">
+                  <span>Enter Speaking Studio</span>
+                  <span class="card-arrow">&rarr;</span>
+                </div>
+              </div>
+
+              <!-- Pillar 3: Reading Part 3 -->
+              <div class="curriculum-card card-mod-3" onclick="window.app.goToSlide(7)">
+                <div>
+                  <div class="card-top-meta">
+                    <span class="curriculum-page-badge">Pages 16&ndash;17</span>
+                    <span class="curriculum-paper-tag">Paper 1</span>
+                  </div>
+                  <h3 class="curriculum-card-title">Reading: "Life's Good! Why So Bad?"</h3>
+                  <p class="curriculum-card-desc">
+                    In-depth psychological analysis of modern prosperity paradoxes. 6 challenging multiple-choice questions with full evidence locators.
+                  </p>
+                  <div class="curriculum-tags-strip">
+                    <span class="curriculum-tag">Academic Essay</span>
+                    <span class="curriculum-tag">6 Questions</span>
+                    <span class="curriculum-tag">Vocabulary Match</span>
+                  </div>
+                </div>
+                <div class="curriculum-card-action">
+                  <span>Enter Reading Room</span>
+                  <span class="card-arrow">&rarr;</span>
+                </div>
+              </div>
+
+              <!-- Pillar 4: Grammar & Use of English -->
+              <div class="curriculum-card card-mod-4" onclick="window.app.goToSlide(10)">
+                <div>
+                  <div class="card-top-meta">
+                    <span class="curriculum-page-badge">Page 18</span>
+                    <span class="curriculum-paper-tag">Paper 1</span>
+                  </div>
+                  <h3 class="curriculum-card-title">Grammar: Gerunds vs. Infinitives</h3>
+                  <p class="curriculum-card-desc">
+                    Subtle semantic shifts between gerunds and infinitives (remember, stop, regret, try). 5 progressive practice stages with instant checking.
+                  </p>
+                  <div class="curriculum-tags-strip">
+                    <span class="curriculum-tag">Rule Explanations</span>
+                    <span class="curriculum-tag">Gap-Fills</span>
+                    <span class="curriculum-tag">Error Analysis</span>
+                  </div>
+                </div>
+                <div class="curriculum-card-action">
+                  <span>Enter Grammar Clinic</span>
+                  <span class="card-arrow">&rarr;</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="keyboard-tips-banner">
-            <span><strong>Presenter Shortcuts:</strong> Use <code>←</code> / <code>→</code> or <code>Space</code> to navigate slides • Press <code>F</code> for Fullscreen • Press <code>T</code> for 1-minute Speaking Timer • Press <code>K</code> for Teacher Answer Key</span>
-          </div>
+          <!-- Section 4: Classroom Presenter Shortcuts -->
+          <footer class="cover-shortcuts-bar">
+            <span class="shortcuts-heading">Presenter &amp; Classroom Controls:</span>
+            <div class="shortcuts-keys-group">
+              <span class="keycap-item"><span class="keycap">&larr;</span> / <span class="keycap">&rarr;</span> or <span class="keycap">Space</span> Next Slide</span>
+              <span class="keycap-item"><span class="keycap">T</span> Speaking Timer</span>
+              <span class="keycap-item"><span class="keycap">K</span> Teacher Answer Key</span>
+              <span class="keycap-item"><span class="keycap">F</span> Fullscreen Mode</span>
+              <span class="keycap-item"><span class="keycap">1&ndash;15</span> Direct Slide Access</span>
+            </div>
+          </footer>
         </div>
       `;
     }
@@ -674,7 +1095,7 @@
           <!-- Warmup Prompt -->
           <div class="prompt-box">
             <div class="prompt-header">
-              <span class="section-tag">[Speaking Discussion]</span>
+              <span class="section-tag">Speaking Discussion</span>
               <strong>1a. Pair Warm-Up Discussion:</strong>
             </div>
             <p class="prompt-text">${p.warmup.prompt}</p>
@@ -739,10 +1160,10 @@
 
               <div class="matching-items-list">
                 ${p.speakers.map((sp, i) => {
-                  const isChecked = !!(this.studentState.checked && this.studentState.checked.listeningPart4);
+                  const isChecked1 = this.isTeacherMode || this.isItemChecked('listeningPart4_t1', sp.id) || this.isItemChecked('listeningPart4', sp.id);
                   const currentVal = state1[sp.id] || "";
                   const isCorrect = currentVal === sp.task1Answer;
-                  const showFeedback = this.isTeacherMode || isChecked;
+                  const showFeedback = isChecked1;
                   return `
                     <div class="match-row ${showFeedback ? (isCorrect ? 'row-correct' : 'row-incorrect') : ''}">
                       <span class="match-num">${i + 1}</span>
@@ -756,7 +1177,8 @@
                             </option>
                           `).join('')}
                         </select>
-                        ${this.isTeacherMode || (isChecked && !isCorrect) ? `<span class="answer-pill">Key: ${sp.task1Answer}</span>` : ''}
+                        <button class="btn-item-check check-single-part4-t1" data-id="${sp.id}">Check</button>
+                        ${this.isTeacherMode || (isChecked1 && !isCorrect) ? `<span class="answer-key-pill">Key: <strong>${sp.task1Answer}</strong></span>` : ''}
                       </div>
                     </div>
                   `;
@@ -779,10 +1201,10 @@
 
               <div class="matching-items-list">
                 ${p.speakers.map((sp, i) => {
-                  const isChecked = !!(this.studentState.checked && this.studentState.checked.listeningPart4);
+                  const isChecked2 = this.isTeacherMode || this.isItemChecked('listeningPart4_t2', sp.id) || this.isItemChecked('listeningPart4', sp.id);
                   const currentVal = state2[sp.id] || "";
                   const isCorrect = currentVal === sp.task2Answer;
-                  const showFeedback = this.isTeacherMode || isChecked;
+                  const showFeedback = isChecked2;
                   return `
                     <div class="match-row ${showFeedback ? (isCorrect ? 'row-correct' : 'row-incorrect') : ''}">
                       <span class="match-num">${i + 6}</span>
@@ -796,7 +1218,8 @@
                             </option>
                           `).join('')}
                         </select>
-                        ${this.isTeacherMode || (isChecked && !isCorrect) ? `<span class="answer-pill">Key: ${sp.task2Answer}</span>` : ''}
+                        <button class="btn-item-check check-single-part4-t2" data-id="${sp.id}">Check</button>
+                        ${this.isTeacherMode || (isChecked2 && !isCorrect) ? `<span class="answer-key-pill">Key: <strong>${sp.task2Answer}</strong></span>` : ''}
                       </div>
                     </div>
                   `;
@@ -807,10 +1230,10 @@
 
           <!-- Actions Bar -->
           <div class="actions-bar">
-            <button class="btn btn-success" id="check-part4-btn">Check Part 4 Answers</button>
+            <button class="btn btn-success" id="check-part4-btn">Check All Part 4 Answers</button>
             ${(() => {
-              const isChecked = !!(this.studentState.checked && this.studentState.checked.listeningPart4);
-              if (!isChecked && !this.isTeacherMode) return '';
+              const hasChecked = this.hasCheckedAny('listeningPart4') || this.hasCheckedAny('listeningPart4_t1') || this.hasCheckedAny('listeningPart4_t2');
+              if (!hasChecked && !this.isTeacherMode) return '';
               let score = 0;
               p.speakers.forEach(sp => {
                 if (state1[sp.id] === sp.task1Answer) score++;
@@ -843,6 +1266,8 @@
     }
 
     bindListeningPart4Events(container) {
+      const p = this.data.listening.part4;
+
       container.querySelectorAll('.play-sp-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const spId = parseInt(btn.getAttribute('data-speaker'), 10);
@@ -902,6 +1327,30 @@
         });
       });
 
+      container.querySelectorAll('.check-single-part4-t1').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = parseInt(btn.getAttribute('data-id'), 10);
+          const sp = p.speakers.find(s => s.id === id);
+          if (sp) {
+            const isMatch = this.studentState.listeningPart4Task1[sp.id] === sp.task1Answer;
+            if (isMatch) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+          }
+          this.setItemChecked('listeningPart4_t1', id);
+        });
+      });
+
+      container.querySelectorAll('.check-single-part4-t2').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = parseInt(btn.getAttribute('data-id'), 10);
+          const sp = p.speakers.find(s => s.id === id);
+          if (sp) {
+            const isMatch = this.studentState.listeningPart4Task2[sp.id] === sp.task2Answer;
+            if (isMatch) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+          }
+          this.setItemChecked('listeningPart4_t2', id);
+        });
+      });
+
       container.querySelector('#check-part4-btn')?.addEventListener('click', () => {
         let score = 0;
         const sps = this.data.listening.part4.speakers;
@@ -913,6 +1362,8 @@
         if (score >= 8) this.sfx.playCorrect(); else this.sfx.playIncorrect();
         this.studentState.checked = this.studentState.checked || {};
         this.studentState.checked.listeningPart4 = true;
+        this.studentState.checked.listeningPart4_t1 = true;
+        this.studentState.checked.listeningPart4_t2 = true;
         this.saveState();
         this.updateView();
       });
@@ -936,7 +1387,7 @@
           <div class="grid-2col">
             <div class="prompt-box">
               <div class="prompt-header">
-                <span class="section-tag">[Pre-Listening]</span>
+                <span class="section-tag">Pre-Listening</span>
                 <strong>2a. Pre-Listening Prediction:</strong>
               </div>
               <p>${p.warmup.prompt}</p>
@@ -975,41 +1426,45 @@
           <div class="gapfill-exercise-box">
             <div class="gapfill-box-header">
               <h3>2b. For questions 1–8, complete the sentences.</h3>
-              <span class="badge badge-sm badge-info">1 to 3 words per gap</span>
+              <span class="badge badge-sm badge-primary">1–3 Words</span>
             </div>
 
             <div class="gapfill-sentences">
               ${p.questions.map(q => {
-                const isChecked = !!(this.studentState.checked && this.studentState.checked.listeningPart2);
+                const showCheck = this.isTeacherMode || this.isItemChecked('listeningPart2', q.num);
                 const currentVal = (state[q.num] || "").trim();
                 const isCorrect = q.acceptedAnswers.some(ans => ans.toLowerCase() === currentVal.toLowerCase());
-                const showCheck = this.isTeacherMode || isChecked;
                 return `
                   <div class="gapfill-row ${showCheck ? (isCorrect ? 'gap-correct' : 'gap-incorrect') : ''}">
                     <span class="gap-num">${q.num}</span>
-                    <span class="gap-text-lead">${q.lead}</span>
-                    <div class="gap-input-wrapper">
-                      <input type="text"
-                        class="gap-input"
-                        data-gap="${q.num}"
-                        value="${this.isTeacherMode ? q.displayAnswer : currentVal}"
-                        placeholder="Type answer..."
-                        autocomplete="off" spellcheck="false" />
-                      <button class="btn-hint" data-gap="${q.num}" title="Show Hint">Hint</button>
+                    <div class="gapfill-text-flow">
+                      <span class="gap-text-lead">${q.lead}</span>
+                      <span class="gap-field-box">
+                        <input type="text"
+                          class="gap-input"
+                          data-gap="${q.num}"
+                          value="${this.isTeacherMode ? q.displayAnswer : currentVal}"
+                          placeholder="..."
+                          autocomplete="off" spellcheck="false" />
+                        <button class="btn-hint" data-gap="${q.num}" title="Show Hint">Hint</button>
+                      </span>
+                      <span class="gap-text-trail">${q.trail}</span>
                     </div>
-                    <span class="gap-text-trail">${q.trail}</span>
-                    ${this.isTeacherMode || (isChecked && !isCorrect) ? `<span class="answer-tag">Key: ${q.displayAnswer}</span>` : ''}
+                    <div class="gapfill-row-actions">
+                      <button class="btn-item-check check-single-gap" data-gap="${q.num}">Check</button>
+                      ${this.isTeacherMode || (showCheck && !isCorrect) ? `<span class="answer-key-pill">Key: <strong>${q.displayAnswer}</strong></span>` : ''}
+                    </div>
                   </div>
                 `;
               }).join('')}
             </div>
 
             <div class="gapfill-footer">
-              <button class="btn btn-success" id="check-gaps-btn">Check My Answers</button>
+              <button class="btn btn-success" id="check-gaps-btn">Check All Answers</button>
               <button class="btn btn-outline" id="show-all-hints-btn">Show All Hints</button>
               ${(() => {
-                const isChecked = !!(this.studentState.checked && this.studentState.checked.listeningPart2);
-                if (!isChecked && !this.isTeacherMode) return '<div id="gap-score-display" class="gap-score-badge hidden"></div>';
+                const hasChecked = this.hasCheckedAny('listeningPart2');
+                if (!hasChecked && !this.isTeacherMode) return '<div id="gap-score-display" class="gap-score-badge hidden"></div>';
                 let score = 0;
                 p.questions.forEach(q => {
                   const val = (state[q.num] || "").trim().toLowerCase();
@@ -1024,7 +1479,7 @@
           <div class="grid-2col mt-4">
             ${p.discussion.map(d => `
               <div class="discussion-card">
-                <span class="section-tag">[Discussion]</span>
+                <span class="section-tag">Discussion</span>
                 <p><strong>${d.prompt}</strong></p>
               </div>
             `).join('')}
@@ -1079,6 +1534,19 @@
         });
       });
 
+      container.querySelectorAll('.check-single-gap').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const gapNum = btn.getAttribute('data-gap');
+          const q = p.questions.find(item => item.num.toString() === gapNum.toString());
+          if (q) {
+            const val = (this.studentState.listeningPart2Gaps[q.num] || "").trim().toLowerCase();
+            const isMatch = q.acceptedAnswers.some(ans => ans.toLowerCase() === val);
+            if (isMatch) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+          }
+          this.setItemChecked('listeningPart2', gapNum);
+        });
+      });
+
       container.querySelector('#check-gaps-btn')?.addEventListener('click', () => {
         let score = 0;
         p.questions.forEach(q => {
@@ -1089,10 +1557,7 @@
         });
 
         if (score >= 6) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        this.studentState.checked = this.studentState.checked || {};
-        this.studentState.checked.listeningPart2 = true;
-        this.saveState();
-        this.updateView();
+        this.setAllChecked('listeningPart2');
       });
 
       container.querySelector('#show-all-hints-btn')?.addEventListener('click', () => {
@@ -1105,12 +1570,13 @@
     getSlide4HTML() {
       const sp = this.data.speaking;
       const t = sp.taskAchievements;
+      const selectedPhotos = this.studentState.selectedPhotosAchievements || ["achieve-a", "achieve-b"];
       return `
         <div class="slide slide-speaking animate-fade-in">
           <div class="slide-header">
             <div>
-              <span class="slide-kicker">Page 15 • Speaking – Part 2</span>
-              <h2 class="slide-title">Compare & Speculate: Achievements</h2>
+              <span class="slide-kicker">Textbook Page 15 • Cambridge C1 Advanced • Speaking Part 2</span>
+              <h2 class="slide-title">Photo Comparison & Speculation: Achievements</h2>
             </div>
             <div class="role-badge-box">
               <span class="badge badge-primary">${t.role} Turn (1 Minute)</span>
@@ -1118,42 +1584,128 @@
             </div>
           </div>
 
-          <!-- Prompt Callout -->
-          <div class="exam-task-box">
-            <div class="task-instruction">
-              <span class="badge badge-accent">3a. ${t.role}:</span>
-              <p>${t.prompt}</p>
+          <!-- Step-by-Step Exam Protocol Banner -->
+          <div class="speaking-guide-card">
+            <div class="speaking-guide-header">
+              <span class="step-badge">i</span>
+              <span>How Cambridge Speaking Part 2 Works (Step-by-Step Guide):</span>
             </div>
-            <div class="task-questions-row">
-              ${t.questions.map(q => `<div class="question-chip">${q}</div>`).join('')}
-            </div>
-          </div>
-
-          <!-- 3 Achievement Photos Visual Grid -->
-          <div class="photo-cards-grid">
-            ${t.photos.map((ph, idx) => `
-              <div class="photo-card" id="card-${ph.id}">
-                <div class="photo-container">
-                  <img src="${ph.imageUrl}" alt="${ph.label}" class="photo-img" onerror="this.src='https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=600&q=80'" />
-                  <span class="photo-label-badge">${['A', 'B', 'C'][idx]}</span>
-                </div>
-                <div class="photo-details">
-                  <h4>${ph.label}</h4>
-                  <p class="photo-desc">${ph.caption}</p>
-                  <div class="photo-meta-tags">
-                    <span class="tag-meta">Domain: ${ph.successType}</span>
-                    <span class="tag-meta">Significance: ${ph.happinessFactor}</span>
-                  </div>
+            <div class="speaking-guide-steps">
+              <div class="speaking-step-item">
+                <span class="step-badge">1</span>
+                <div>
+                  <strong>Choose Any 2 Photos:</strong>
+                  <p>Click 2 photos below to select them. In the exam, you only talk about two photos, never all three.</p>
                 </div>
               </div>
-            `).join('')}
+              <div class="speaking-step-item">
+                <span class="step-badge">2</span>
+                <div>
+                  <strong>Candidate A (60 Seconds):</strong>
+                  <p>Compare the two photos and answer Question 1 & Question 2 below without interruption.</p>
+                </div>
+              </div>
+              <div class="speaking-step-item">
+                <span class="step-badge">3</span>
+                <div>
+                  <strong>Candidate B (30 Seconds):</strong>
+                  <p>Partner listens, then answers the follow-up question in approximately 30 seconds.</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <!-- Student B Follow up -->
+          <!-- The 2 Core Questions as Clear Cards -->
+          <div class="exam-task-box">
+            <div class="task-instruction">
+              <span class="section-tag">Candidate A Task (1 Minute)</span>
+              <p>Compare your 2 chosen pictures, and address these two specific exam questions:</p>
+            </div>
+            <div class="task-questions-grid">
+              <div class="task-question-card">
+                <span class="q-num-badge">1</span>
+                <div>
+                  <strong>What kind of success is portrayed in each photo?</strong>
+                  <p class="tip-subtext">Focus on the nature of the achievement (e.g. domestic, developmental, sporting).</p>
+                </div>
+              </div>
+              <div class="task-question-card">
+                <span class="q-num-badge">2</span>
+                <div>
+                  <strong>Who do you think might be feeling the happiest?</strong>
+                  <p class="tip-subtext">Speculate on emotional states using modal verbs (might, may, could, must).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3 Achievement Photos Visual Grid with Click-to-Select -->
+          <div class="photo-cards-grid">
+            ${t.photos.map((ph, idx) => {
+              const letter = ['A', 'B', 'C'][idx];
+              const isSelected = selectedPhotos.includes(ph.id);
+              const selOrder = selectedPhotos.indexOf(ph.id) + 1;
+              return `
+                <div class="photo-card ${isSelected ? 'photo-selected' : ''}" id="card-${ph.id}" data-photo-id="${ph.id}" style="cursor: pointer;">
+                  <div class="photo-container">
+                    <img src="${ph.imageUrl}" alt="${ph.label}" class="photo-img" onerror="this.src='https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=600&q=80'" />
+                    <span class="photo-label-badge">${letter}</span>
+                  </div>
+                  <div class="photo-details">
+                    <h4>${ph.label}</h4>
+                    <p class="photo-desc">${ph.caption}</p>
+                    <div class="photo-meta-tags">
+                      <span class="tag-meta"><strong>Milestone:</strong> ${ph.successType}</span>
+                      <span class="tag-meta"><strong>Feelings:</strong> ${ph.happinessFactor}</span>
+                    </div>
+                  </div>
+                  <div class="photo-select-status">
+                    ${isSelected ? `Selected for Comparison (${selOrder} of 2)` : `Click to select Photo ${letter}`}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <!-- Candidate B Follow-up Card -->
           <div class="student-b-card">
-            <span class="badge badge-secondary">${t.followUpRole} Follow-up:</span>
-            <strong>${t.followUpQuestion}</strong>
-            <span class="tip-subtext">(Respond in approx. 30 seconds)</span>
+            <span class="b-card-badge">Candidate B Follow-up (30 Seconds)</span>
+            <div class="b-card-content">
+              <h4>${t.followUpQuestion}</h4>
+              <p class="tip-subtext">Strategy: Give a clear, direct answer in 1–2 sentences, then contrast the long-term discipline needed for different achievements.</p>
+            </div>
+          </div>
+
+          <!-- C1 Benchmark Model Answer Section -->
+          <div class="model-answer-section">
+            <div class="model-header">
+              <div class="model-title-group">
+                <span class="section-tag">C1 Benchmark Model</span>
+                <h4>Need guidance? Listen to or read a high-scoring C1 model response:</h4>
+              </div>
+              <div class="model-actions">
+                <button class="btn btn-primary btn-sm" id="play-model-speech-btn">
+                  Play Model Audio
+                </button>
+                <button class="btn btn-outline btn-sm" id="toggle-model-transcript-btn">
+                  Show Model Transcript
+                </button>
+              </div>
+            </div>
+            <div id="model-transcript-box" class="model-transcript-card hidden">
+              <span class="transcript-meta">Model Response comparing: ${t.modelAnswer.comparingPhotos}</span>
+              <p class="model-text">"${t.modelAnswer.speechText}"</p>
+              <div class="c1-phrases-box">
+                <strong>Highlighted C1 Discourse Markers:</strong>
+                <div class="chips-cloud">
+                  ${t.modelAnswer.keyPhrases.map(ph => `<span class="phrase-chip">${ph}</span>`).join('')}
+                </div>
+              </div>
+              <div class="partner-model-box">
+                <strong>Candidate B Model Follow-up:</strong>
+                <p class="partner-speech-text">"${t.modelAnswer.partnerModel.speechText}"</p>
+              </div>
+            </div>
           </div>
 
           <!-- Useful Language Toolkit & Timer Launcher -->
@@ -1177,10 +1729,15 @@
             <div class="tools-right">
               <div class="quick-timer-box">
                 <span class="timer-label">Exam Timer:</span>
-                <span class="timer-digits-sm" id="slide-timer-preview">01:00</span>
-                <button class="btn btn-primary btn-sm" id="launch-exam-timer-btn">
-                  Open Speaking Timer
-                </button>
+                <span class="timer-digits-sm slide-timer-preview" id="slide-timer-preview">01:00</span>
+                <div class="quick-timer-btns-row">
+                  <button class="btn btn-primary btn-sm btn-slide-timer-toggle">
+                    Start Timer
+                  </button>
+                  <button class="btn btn-outline btn-sm btn-slide-timer-edit">
+                    Edit Time
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1189,6 +1746,316 @@
     }
 
     bindSpeakingAchievementsEvents(container) {
+      container.querySelectorAll('.photo-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const photoId = card.getAttribute('data-photo-id');
+          this.togglePhotoSelection('selectedPhotosAchievements', photoId);
+        });
+      });
+
+      const playModelBtn = container.querySelector('#play-model-speech-btn');
+      playModelBtn?.addEventListener('click', () => {
+        const t = this.data.speaking.taskAchievements;
+        if (this.tts.isSpeaking && playModelBtn.classList.contains('playing')) {
+          this.tts.stop();
+          playModelBtn.classList.remove('playing');
+          playModelBtn.textContent = 'Play Model Audio';
+        } else {
+          playModelBtn.classList.add('playing');
+          playModelBtn.textContent = 'Stop Audio';
+          this.tts.speak(t.modelAnswer.speechText, {
+            rate: 0.95,
+            pitch: 1.0,
+            onEnd: () => {
+              playModelBtn.classList.remove('playing');
+              playModelBtn.textContent = 'Play Model Audio';
+            }
+          });
+        }
+      });
+
+      container.querySelector('#toggle-model-transcript-btn')?.addEventListener('click', (e) => {
+        const box = container.querySelector('#model-transcript-box');
+        box?.classList.toggle('hidden');
+        e.target.textContent = box?.classList.contains('hidden') ? 'Show Model Transcript' : 'Hide Model Transcript';
+      });
+
+      container.querySelector('.btn-slide-timer-toggle')?.addEventListener('click', () => {
+        if (this.timer.isRunning) {
+          this.timer.pause();
+        } else {
+          this.timer.start();
+        }
+      });
+
+      container.querySelector('.btn-slide-timer-edit')?.addEventListener('click', () => {
+        this.toggleTimerModal();
+      });
+
+      container.querySelectorAll('.phrase-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const phrase = chip.getAttribute('data-phrase');
+          chip.classList.add('chip-active');
+          this.tts.speak(phrase, {
+            rate: 0.9,
+            onEnd: () => chip.classList.remove('chip-active')
+          });
+        });
+      });
+    }
+
+    // --- SLIDE 5: SPEAKING PART 2 (CELEBRATIONS) ---
+    getSlide5HTML() {
+      const sp = this.data.speaking;
+      const t = sp.taskCelebrations;
+      const selectedPhotos = this.studentState.selectedPhotosCelebrations || ["celeb-b", "celeb-c"];
+      return `
+        <div class="slide slide-speaking animate-fade-in">
+          <div class="slide-header">
+            <div>
+              <span class="slide-kicker">Textbook Page 15 • Speaking – Part 2 (Partner Turn)</span>
+              <h2 class="slide-title">Photo Comparison & Speculation: Celebrations</h2>
+            </div>
+            <div class="role-badge-box">
+              <span class="badge badge-secondary">${t.role} Turn (1 Minute)</span>
+              <span class="badge badge-outline">Exam Task 3c & 3d</span>
+            </div>
+          </div>
+
+          <!-- Step-by-Step Exam Protocol Banner -->
+          <div class="speaking-guide-card">
+            <div class="speaking-guide-header">
+              <span class="step-badge">i</span>
+              <span>How Cambridge Speaking Part 2 Works (Partner Turn):</span>
+            </div>
+            <div class="speaking-guide-steps">
+              <div class="speaking-step-item">
+                <span class="step-badge">1</span>
+                <div>
+                  <strong>Select Any 2 Photos:</strong>
+                  <p>Click 2 photos below to compare. In Cambridge Part 2, each candidate receives 3 new photos.</p>
+                </div>
+              </div>
+              <div class="speaking-step-item">
+                <span class="step-badge">2</span>
+                <div>
+                  <strong>Candidate B (60 Seconds):</strong>
+                  <p>Compare the occasions and speculate on what each situation means to the celebrant.</p>
+                </div>
+              </div>
+              <div class="speaking-step-item">
+                <span class="step-badge">3</span>
+                <div>
+                  <strong>Candidate A (30 Seconds):</strong>
+                  <p>Candidate A answers the follow-up question on how the celebrations might develop.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- The 2 Core Questions as Clear Cards -->
+          <div class="exam-task-box">
+            <div class="task-instruction">
+              <span class="section-tag">Candidate B Task (1 Minute)</span>
+              <p>Compare your 2 chosen pictures, and address these two specific exam questions:</p>
+            </div>
+            <div class="task-questions-grid">
+              <div class="task-question-card">
+                <span class="q-num-badge">1</span>
+                <div>
+                  <strong>What differences are there between the two occasions?</strong>
+                  <p class="tip-subtext">Contrast the scale, atmosphere, formality, and nature of the milestones.</p>
+                </div>
+              </div>
+              <div class="task-question-card">
+                <span class="q-num-badge">2</span>
+                <div>
+                  <strong>What do you think each situation means to the person celebrating?</strong>
+                  <p class="tip-subtext">Speculate on deeper personal meaning (relief, nostalgia, excitement, pride).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3 Celebration Photos Visual Grid with Real Images & Selection -->
+          <div class="photo-cards-grid">
+            ${t.photos.map((ph, idx) => {
+              const letter = ['A', 'B', 'C'][idx];
+              const isSelected = selectedPhotos.includes(ph.id);
+              const selOrder = selectedPhotos.indexOf(ph.id) + 1;
+              return `
+                <div class="photo-card ${isSelected ? 'photo-selected' : ''}" id="card-${ph.id}" data-photo-id="${ph.id}" style="cursor: pointer;">
+                  <div class="photo-container">
+                    <img src="${ph.imageUrl}" alt="${ph.label}" class="photo-img" onerror="this.src='https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=600&q=80'" />
+                    <span class="photo-label-badge">${letter}</span>
+                  </div>
+                  <div class="photo-details">
+                    <h4>${ph.label}</h4>
+                    <p class="photo-desc">${ph.caption}</p>
+                    <div class="photo-meta-tags">
+                      <span class="tag-meta"><strong>Occasion:</strong> ${ph.occasionType}</span>
+                      <span class="tag-meta"><strong>Significance:</strong> ${ph.meaning}</span>
+                    </div>
+                  </div>
+                  <div class="photo-select-status">
+                    ${isSelected ? `Selected for Comparison (${selOrder} of 2)` : `Click to select Photo ${letter}`}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <!-- Student A Follow up -->
+          <div class="student-b-card">
+            <span class="b-card-badge">Candidate A Follow-up (30 Seconds)</span>
+            <div class="b-card-content">
+              <h4>${t.followUpQuestion}</h4>
+              <p class="tip-subtext">(Consider: subsequent activities, emotions, how guests and family will spend the rest of the day)</p>
+            </div>
+          </div>
+
+          <!-- C1 Benchmark Model Answer Section -->
+          <div class="model-answer-section">
+            <div class="model-header">
+              <div class="model-title-group">
+                <span class="section-tag">C1 Benchmark Model</span>
+                <h4>Need guidance? Listen to or read a high-scoring C1 model response:</h4>
+              </div>
+              <div class="model-actions">
+                <button class="btn btn-primary btn-sm" id="play-model-speech-btn-5">
+                  Play Model Audio
+                </button>
+                <button class="btn btn-outline btn-sm" id="toggle-model-transcript-btn-5">
+                  Show Model Transcript
+                </button>
+              </div>
+            </div>
+            <div id="model-transcript-box-5" class="model-transcript-card hidden">
+              <span class="transcript-meta">Model Response comparing: ${t.modelAnswer.comparingPhotos}</span>
+              <p class="model-text">"${t.modelAnswer.speechText}"</p>
+              <div class="c1-phrases-box">
+                <strong>Highlighted C1 Discourse Markers:</strong>
+                <div class="chips-cloud">
+                  ${t.modelAnswer.keyPhrases.map(ph => `<span class="phrase-chip">${ph}</span>`).join('')}
+                </div>
+              </div>
+              <div class="partner-model-box">
+                <strong>Candidate A Model Follow-up:</strong>
+                <p class="partner-speech-text">"${t.modelAnswer.partnerModel.speechText}"</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Speaking Scaffold / Sentence Builder -->
+          <div class="speech-builder-box">
+            <h4>Candidate Speech Constructor (Click chips to build your 1-minute plan):</h4>
+            <div class="builder-columns">
+              <div class="builder-col">
+                <span class="col-title">1. Introduction & Contrast:</span>
+                <div class="builder-chips">
+                  <span class="builder-chip" data-insert="Both pictures show people celebrating important milestones, but...">"Both pictures show people celebrating..."</span>
+                  <span class="builder-chip" data-insert="The most striking difference between the two occasions is...">"The most striking difference is..."</span>
+                  <span class="builder-chip" data-insert="In the graduation photo, whereas in the anniversary celebration...">"In the graduation photo, whereas..."</span>
+                </div>
+              </div>
+              <div class="builder-col">
+                <span class="col-title">2. Speculate on Meaning:</span>
+                <div class="builder-chips">
+                  <span class="builder-chip" data-insert="I imagine that for the graduate, this represents years of sacrifice and scholarly effort...">"I imagine that for the graduate..."</span>
+                  <span class="builder-chip" data-insert="They appear to be experiencing a deep sense of relief and accomplishment...">"They appear to be experiencing..."</span>
+                  <span class="builder-chip" data-insert="Although I can't be sure, perhaps the couple are feeling deep gratitude for a lifetime together...">"Although I can't be sure, perhaps..."</span>
+                </div>
+              </div>
+            </div>
+            <div class="builder-output-area">
+              <textarea id="speaking-notes-input" placeholder="Click any phrase above or type your 1-minute speaking plan here..." rows="3"></textarea>
+            </div>
+          </div>
+
+          <!-- Useful Language Toolkit & Quick Timer -->
+          <div class="speaking-tools-panel mt-4">
+            <div class="tools-left">
+              <h4>Useful Language Bank (Click phrase to hear pronunciation):</h4>
+              <div class="chips-cloud">
+                ${sp.usefulLanguage.comparing.slice(4, 8).map(ph => `
+                  <button class="phrase-chip" data-phrase="${ph}">
+                    "${ph}"
+                  </button>
+                `).join('')}
+                ${sp.usefulLanguage.speculating.slice(2, 6).map(ph => `
+                  <button class="phrase-chip chip-speculate" data-phrase="${ph}">
+                    "${ph}"
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="tools-right">
+              <div class="quick-timer-box">
+                <span class="timer-label">Exam Timer:</span>
+                <span class="timer-digits-sm slide-timer-preview" id="slide-timer-preview-5">01:00</span>
+                <div class="quick-timer-btns-row">
+                  <button class="btn btn-primary btn-sm btn-slide-timer-toggle" id="slide-timer-toggle-btn-5">
+                    Start Timer
+                  </button>
+                  <button class="btn btn-outline btn-sm btn-slide-timer-edit" id="launch-exam-timer-btn-5">
+                    Edit Time
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    bindSpeakingCelebrationsEvents(container) {
+      container.querySelectorAll('.photo-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const photoId = card.getAttribute('data-photo-id');
+          this.togglePhotoSelection('selectedPhotosCelebrations', photoId);
+        });
+      });
+
+      const playModelBtn = container.querySelector('#play-model-speech-btn-5');
+      playModelBtn?.addEventListener('click', () => {
+        const t = this.data.speaking.taskCelebrations;
+        if (this.tts.isSpeaking && playModelBtn.classList.contains('playing')) {
+          this.tts.stop();
+          playModelBtn.classList.remove('playing');
+          playModelBtn.textContent = 'Play Model Audio';
+        } else {
+          playModelBtn.classList.add('playing');
+          playModelBtn.textContent = 'Stop Audio';
+          this.tts.speak(t.modelAnswer.speechText, {
+            rate: 0.95,
+            pitch: 1.0,
+            onEnd: () => {
+              playModelBtn.classList.remove('playing');
+              playModelBtn.textContent = 'Play Model Audio';
+            }
+          });
+        }
+      });
+
+      container.querySelector('#toggle-model-transcript-btn-5')?.addEventListener('click', (e) => {
+        const box = container.querySelector('#model-transcript-box-5');
+        box?.classList.toggle('hidden');
+        e.target.textContent = box?.classList.contains('hidden') ? 'Show Model Transcript' : 'Hide Model Transcript';
+      });
+
+      container.querySelector('.btn-slide-timer-toggle')?.addEventListener('click', () => {
+        if (this.timer.isRunning) {
+          this.timer.pause();
+        } else {
+          this.timer.start();
+        }
+      });
+
+      container.querySelector('.btn-slide-timer-edit')?.addEventListener('click', () => {
+        this.toggleTimerModal();
+      });
+
       container.querySelectorAll('.phrase-chip').forEach(chip => {
         chip.addEventListener('click', () => {
           const phrase = chip.getAttribute('data-phrase');
@@ -1200,99 +2067,6 @@
         });
       });
 
-      container.querySelector('#launch-exam-timer-btn')?.addEventListener('click', () => {
-        this.toggleTimerModal();
-      });
-    }
-
-    // --- SLIDE 5: SPEAKING PART 2 (CELEBRATIONS) ---
-    getSlide5HTML() {
-      const sp = this.data.speaking;
-      const t = sp.taskCelebrations;
-      return `
-        <div class="slide slide-speaking animate-fade-in">
-          <div class="slide-header">
-            <div>
-              <span class="slide-kicker">Page 15 • Speaking – Part 2 (Continued)</span>
-              <h2 class="slide-title">Compare & Speculate: Celebrations</h2>
-            </div>
-            <div class="role-badge-box">
-              <span class="badge badge-secondary">${t.role} Turn (1 Minute)</span>
-              <span class="badge badge-outline">Exam Task 3c & 3d</span>
-            </div>
-          </div>
-
-          <!-- Prompt Callout -->
-          <div class="exam-task-box">
-            <div class="task-instruction">
-              <span class="badge badge-secondary">3c. ${t.role}:</span>
-              <p>${t.prompt}</p>
-            </div>
-            <div class="task-questions-row">
-              ${t.questions.map(q => `<div class="question-chip">${q}</div>`).join('')}
-            </div>
-          </div>
-
-          <!-- 3 Celebration Photos Visual Grid -->
-          <div class="photo-cards-grid">
-            ${t.photos.map((ph, idx) => `
-              <div class="photo-card" id="card-${ph.id}">
-                <div class="photo-container">
-                  <div class="photo-fallback-graphic photo-graphic-${idx + 1}">
-                    <span class="graphic-badge">[Photo ${['A', 'B', 'C'][idx]}]</span>
-                    <span class="graphic-title">${ph.label}</span>
-                  </div>
-                  <span class="photo-label-badge">${['A', 'B', 'C'][idx]}</span>
-                </div>
-                <div class="photo-details">
-                  <h4>${ph.label}</h4>
-                  <p class="photo-desc">${ph.caption}</p>
-                  <div class="photo-meta-tags">
-                    <span class="tag-meta">Occasion: ${ph.occasionType}</span>
-                    <span class="tag-meta">Significance: ${ph.meaning}</span>
-                  </div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-
-          <!-- Student A Follow up -->
-          <div class="student-b-card">
-            <span class="badge badge-primary">${t.followUpRole} Follow-up:</span>
-            <strong>${t.followUpQuestion}</strong>
-            <span class="tip-subtext">(Consider: guests, emotions, memories made)</span>
-          </div>
-
-          <!-- Interactive Speaking Scaffold / Sentence Builder -->
-          <div class="speech-builder-box">
-            <h4>Candidate Speech Constructor (Combine phrases to practice your answer):</h4>
-            <div class="builder-columns">
-              <div class="builder-col">
-                <span class="col-title">1. Introduction / Compare:</span>
-                <div class="builder-chips">
-                  <span class="builder-chip" data-insert="Both pictures show people celebrating important milestones, but...">"Both pictures show..."</span>
-                  <span class="builder-chip" data-insert="The most striking difference between the child's party and the graduation is...">"The most striking difference is..."</span>
-                  <span class="builder-chip" data-insert="In the picture on the left, whereas in the graduation photo...">"In the picture on the left, whereas..."</span>
-                </div>
-              </div>
-              <div class="builder-col">
-                <span class="col-title">2. Speculate on Meaning:</span>
-                <div class="builder-chips">
-                  <span class="builder-chip" data-insert="I imagine that for the graduate, this represents years of sacrifice...">"I imagine that for..."</span>
-                  <span class="builder-chip" data-insert="They appear to be experiencing a deep sense of relief and accomplishment...">"They appear to be..."</span>
-                  <span class="builder-chip" data-insert="Although I can't be sure, perhaps the elderly couple are celebrating...">"Although I can't be sure, perhaps..."</span>
-                </div>
-              </div>
-            </div>
-            <div class="builder-output-area">
-              <textarea id="speaking-notes-input" placeholder="Type your 1-minute speaking plan or draft speech here..." rows="3"></textarea>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    bindSpeakingCelebrationsEvents(container) {
       container.querySelectorAll('.builder-chip').forEach(chip => {
         chip.addEventListener('click', () => {
           const insertText = chip.getAttribute('data-insert');
@@ -1323,7 +2097,7 @@
           <!-- Activity 4: Cambridge Assessment Rubric -->
           <div class="rubric-box mb-4">
             <div class="rubric-header">
-              <span class="section-tag">[Assessment Criteria]</span>
+              <span class="section-tag">Assessment Criteria</span>
               <strong>Activity 4: Candidate Performance Assessment Rubric</strong>
             </div>
             <div class="rubric-grid">
@@ -1367,10 +2141,10 @@
             <!-- Dialogue Scenarios Interactive List -->
             <div class="dialogues-list">
               ${ee.scenarios.map(sc => {
-                const isChecked = !!(this.studentState.checked && this.studentState.checked.everydayEnglish);
+                const isChecked = this.isTeacherMode || this.isItemChecked('everydayEnglish', sc.id);
                 const currentVal = state[sc.id] || "";
                 const isCorrect = currentVal.toLowerCase() === sc.bestResponse.toLowerCase();
-                const showCheck = this.isTeacherMode || isChecked;
+                const showCheck = isChecked;
                 return `
                   <div class="dialogue-card ${showCheck ? (isCorrect ? 'card-correct' : 'card-incorrect') : ''}">
                     <div class="dialogue-speaker-a">
@@ -1383,15 +2157,19 @@
                     <div class="dialogue-speaker-b">
                       <span class="speaker-avatar">B</span>
                       <div class="bubble-b">
-                        <select class="form-select ee-select" data-id="${sc.id}">
-                          <option value="">Select Response...</option>
-                          ${ee.expressions.map(e => `
-                            <option value="${e.phrase}" ${(this.isTeacherMode ? sc.bestResponse : currentVal) === e.phrase ? 'selected' : ''}>
-                              ${e.phrase} (${e.tone})
-                            </option>
-                          `).join('')}
-                        </select>
-                        ${this.isTeacherMode || (isChecked && !isCorrect) ? `<span class="answer-tag">Key: ${sc.bestResponse}</span>` : ''}
+                        <div class="ee-select-row">
+                          <select class="form-select ee-select" data-id="${sc.id}">
+                            <option value="">Select Response...</option>
+                            ${ee.expressions.map(e => `
+                              <option value="${e.phrase}" ${(this.isTeacherMode ? sc.bestResponse : currentVal) === e.phrase ? 'selected' : ''}>
+                                ${e.phrase} (${e.tone})
+                              </option>
+                            `).join('')}
+                          </select>
+                          <button class="btn-item-check check-single-ee" data-id="${sc.id}">Check</button>
+                        </div>
+                        ${showCheck && !isCorrect ? `<span class="answer-key-pill">Key: <strong>${sc.bestResponse}</strong></span>` : ''}
+                        ${showCheck ? `<div class="ee-item-exp"><em>Note:</em> ${sc.explanation}</div>` : ''}
                       </div>
                     </div>
                   </div>
@@ -1400,10 +2178,10 @@
             </div>
 
             <div class="ee-actions">
-              <button class="btn btn-success" id="check-ee-btn">Check Responses</button>
+              <button class="btn btn-success" id="check-ee-btn">Check All Responses</button>
               ${(() => {
-                const isChecked = !!(this.studentState.checked && this.studentState.checked.everydayEnglish);
-                if (!isChecked && !this.isTeacherMode) return '<div id="ee-score-box" class="feedback-box hidden"></div>';
+                const hasChecked = this.hasCheckedAny('everydayEnglish');
+                if (!hasChecked && !this.isTeacherMode) return '<div id="ee-score-box" class="feedback-box hidden"></div>';
                 let score = 0;
                 ee.scenarios.forEach(sc => {
                   if (state[sc.id] === sc.bestResponse) score++;
@@ -1411,14 +2189,6 @@
                 return `
                   <div id="ee-score-box" class="feedback-box feedback-info">
                     <strong>Score: ${score} / ${ee.scenarios.length} Correct</strong>
-                    <div class="mt-2">
-                      <h4 style="font-size: 13px; margin: 8px 0 4px 0;">Nuance & Pragmatic Explanations:</h4>
-                      <ul style="padding-left: 18px; font-size: 12.5px;">
-                        ${ee.scenarios.map(sc => `
-                          <li><strong>Scenario ${sc.id}:</strong> <em>${sc.bestResponse}</em> – ${sc.explanation}</li>
-                        `).join('')}
-                      </ul>
-                    </div>
                   </div>
                 `;
               })()}
@@ -1446,16 +2216,25 @@
         });
       });
 
+      container.querySelectorAll('.check-single-ee').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          const sc = ee.scenarios.find(item => item.id.toString() === id.toString());
+          if (sc) {
+            const isCorrect = (this.studentState.everydayEnglish[sc.id] || '').toLowerCase() === sc.bestResponse.toLowerCase();
+            if (isCorrect) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+          }
+          this.setItemChecked('everydayEnglish', id);
+        });
+      });
+
       container.querySelector('#check-ee-btn')?.addEventListener('click', () => {
         let score = 0;
         ee.scenarios.forEach(sc => {
           if (this.studentState.everydayEnglish[sc.id] === sc.bestResponse) score++;
         });
         if (score === ee.scenarios.length) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        this.studentState.checked = this.studentState.checked || {};
-        this.studentState.checked.everydayEnglish = true;
-        this.saveState();
-        this.updateView();
+        this.setAllChecked('everydayEnglish');
       });
     }
 
@@ -1485,7 +2264,7 @@
             </div>
 
             <div class="prompt-box">
-              <div class="prompt-header"><span class="section-tag">[Pre-Reading]</span> <strong>Pre-Reading Discussion Questions:</strong></div>
+              <div class="prompt-header"><span class="section-tag">Pre-Reading</span> <strong>Pre-Reading Discussion Questions:</strong></div>
               <ul class="clean-list">
                 ${r.preReading.map(pr => `<li>${pr}</li>`).join('')}
               </ul>
@@ -1611,10 +2390,10 @@
 
           <div class="mc-quiz-container">
             ${r.questions.map(q => {
-              const isChecked = !!(this.studentState.checked && this.studentState.checked.readingMC);
+              const isChecked = this.isTeacherMode || this.isItemChecked('readingMC', q.id);
               const currentChoice = state[q.id] || "";
               const isCorrect = currentChoice === q.correct;
-              const showFeedback = this.isTeacherMode || isChecked;
+              const showFeedback = isChecked;
               return `
                 <div class="mc-card ${showFeedback ? (isCorrect ? 'mc-correct' : 'mc-incorrect') : ''}" id="mc-card-${q.id}">
                   <div class="mc-question-title">
@@ -1637,8 +2416,11 @@
                       `;
                     }).join('')}
                   </div>
-                  <div class="mc-explanation ${this.isTeacherMode || isChecked ? '' : 'hidden'}" id="mc-exp-${q.id}">
-                    <strong>Correct Key: [${q.correct}]</strong> — ${q.explanation}
+                  <div class="mc-card-actions">
+                    <button class="btn-item-check check-single-mc" data-qid="${q.id}">Check Question ${q.id}</button>
+                  </div>
+                  <div class="mc-explanation ${showFeedback ? '' : 'hidden'}" id="mc-exp-${q.id}">
+                    <span class="answer-key-pill">Key: <strong>${q.correct}</strong></span> ${q.explanation}
                   </div>
                 </div>
               `;
@@ -1646,10 +2428,10 @@
           </div>
 
           <div class="mc-footer-actions">
-            <button class="btn btn-success btn-lg" id="check-mc-btn">Score My Reading Answers</button>
+            <button class="btn btn-success btn-lg" id="check-mc-btn">Score All Reading Answers</button>
             ${(() => {
-              const isChecked = !!(this.studentState.checked && this.studentState.checked.readingMC);
-              if (!isChecked && !this.isTeacherMode) return '<div id="mc-total-score-badge" class="score-badge-large hidden"></div>';
+              const hasChecked = this.hasCheckedAny('readingMC');
+              if (!hasChecked && !this.isTeacherMode) return '<div id="mc-total-score-badge" class="score-badge-large hidden"></div>';
               let score = 0;
               r.questions.forEach(q => {
                 if (state[q.id] === q.correct) score++;
@@ -1672,6 +2454,18 @@
         });
       });
 
+      container.querySelectorAll('.check-single-mc').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const qid = btn.getAttribute('data-qid');
+          const q = r.questions.find(item => item.id.toString() === qid.toString());
+          if (q) {
+            const isCorrect = this.studentState.readingMC[q.id] === q.correct;
+            if (isCorrect) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+          }
+          this.setItemChecked('readingMC', qid);
+        });
+      });
+
       container.querySelector('#check-mc-btn')?.addEventListener('click', () => {
         let score = 0;
         r.questions.forEach(q => {
@@ -1679,10 +2473,7 @@
         });
 
         if (score >= 5) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        this.studentState.checked = this.studentState.checked || {};
-        this.studentState.checked.readingMC = true;
-        this.saveState();
-        this.updateView();
+        this.setAllChecked('readingMC');
       });
     }
 
@@ -1702,7 +2493,7 @@
           <!-- Activity 3a: Synonyms for Miserable (Interactive) -->
           <div class="vocab-workshop-card mb-4">
             <div class="workshop-header">
-              <span class="section-tag">[Vocabulary Search]</span>
+              <span class="section-tag">Vocabulary Search</span>
               <div>
                 <h4>3a. Find at least three words or phrases in the text which are synonyms for 'miserable':</h4>
                 <p>Type the synonyms you discovered in the article text below, then click Check:</p>
@@ -1749,7 +2540,7 @@
           <!-- Activity 4: Idiomatic Expressions Deep Dive -->
           <div class="vocab-workshop-card mb-4">
             <div class="workshop-header">
-              <span class="section-tag">[Idioms & Metaphors]</span>
+              <span class="section-tag">Idioms & Metaphors</span>
               <div>
                 <h4>4. Text Analysis: What does the writer mean by these underlined phrases?</h4>
               </div>
@@ -1768,7 +2559,7 @@
           <!-- Activity 5c: Interactive Class Poll: What makes you happy? -->
           <div class="poll-widget-card">
             <div class="workshop-header">
-              <span class="section-tag">[Classroom Poll]</span>
+              <span class="section-tag">Classroom Poll</span>
               <div>
                 <h4>5c. THINK! What are the 5 most important things that make you feel happy?</h4>
                 <p>Vote for your top priorities to see live aggregate classroom results:</p>
@@ -1785,7 +2576,7 @@
                 { label: "Creative Hobbies & Leisure", votes: 19, code: "F" }
               ].map(opt => `
                 <div class="poll-card" onclick="window.app.votePoll(this)">
-                  <span class="poll-badge">[Option ${opt.code}]</span>
+                  <span class="poll-badge">Option ${opt.code}</span>
                   <div class="poll-info">
                     <strong>${opt.label}</strong>
                     <div class="poll-meter-track">
@@ -1823,24 +2614,6 @@
       });
     }
 
-    votePoll(cardEl) {
-      this.sfx.playClick();
-      cardEl.classList.toggle('voted');
-      const countEl = cardEl.querySelector('.poll-count');
-      const fillEl = cardEl.querySelector('.poll-meter-fill');
-      if (countEl && fillEl) {
-        let num = parseInt(countEl.textContent, 10);
-        if (cardEl.classList.contains('voted')) {
-          num++;
-          fillEl.style.width = `${Math.min(100, num * 2)}%`;
-        } else {
-          num--;
-          fillEl.style.width = `${Math.min(100, num * 2)}%`;
-        }
-        countEl.textContent = `${num} votes`;
-      }
-    }
-
     // --- SLIDE 10: USE OF ENGLISH - GERUNDS AS SUBJECTS (EX 1) ---
     getSlide10HTML() {
       const u = this.data.useOfEnglish;
@@ -1853,12 +2626,12 @@
               <span class="slide-kicker">Page 18 • Use of English: Gerund / Infinitive</span>
               <h2 class="slide-title">1. Sentence Transformation with Gerunds</h2>
             </div>
-            <span class="badge badge-primary">Grammar Reference: -ing Subjects</span>
+            <span class="badge badge-primary">Grammar Ref: -ing Subjects</span>
           </div>
 
           <!-- Model Example Card -->
           <div class="model-example-box mb-4">
-            <span class="badge badge-accent">Textbook Example:</span>
+            <span class="badge badge-accent">Model Example</span>
             <div class="example-transformation">
               <span class="ex-orig">Original: <em>"${ex.example.original}"</em></span>
               <span class="ex-arrow">→</span>
@@ -1870,8 +2643,7 @@
           <!-- Exercises 2, 3, 4 -->
           <div class="transform-list">
             ${ex.items.map(item => {
-              const checkedMap = (this.studentState.checked && this.studentState.checked.useOfEnglish1a) || {};
-              const isChecked = !!checkedMap[item.id];
+              const isChecked = this.isItemChecked('useOfEnglish1a', item.id);
               const currentVal = state[item.id] || "";
               const isMatch = currentVal.trim().toLowerCase().replace(/[.,!]/g, '') === item.expected.toLowerCase().replace(/[.,!]/g, '');
               const show = this.isTeacherMode || isChecked;
@@ -1887,9 +2659,9 @@
                       data-id="${item.id}"
                       value="${this.isTeacherMode ? item.expected : currentVal}"
                       placeholder="Rewrite starting with a gerund (-ing)..." />
-                    <button class="btn btn-sm btn-outline check-single-1a" data-id="${item.id}">Check</button>
+                    <button class="btn-item-check check-single-1a" data-id="${item.id}">Check</button>
                   </div>
-                  ${this.isTeacherMode || isChecked ? `<div class="model-key">Model Answer: <strong>${item.expected}</strong></div>` : ''}
+                  ${this.isTeacherMode || isChecked ? `<div class="model-key"><span class="badge badge-success">Model Answer</span> <strong>${item.expected}</strong></div>` : ''}
                 </div>
               `;
             }).join('')}
@@ -1898,7 +2670,7 @@
           <!-- Ex 1b Personal Reflection -->
           <div class="prompt-box mt-4">
             <div class="prompt-header">
-              <span class="section-tag">[Speaking / Writing]</span>
+              <span class="section-tag">Speaking & Writing</span>
               <strong>1b. Answer these questions in the two ways shown above:</strong>
             </div>
             <div class="questions-reflection-grid">
@@ -1919,6 +2691,21 @@
               </div>
             </div>
           </div>
+
+          <div class="actions-bar mt-4">
+            <button class="btn btn-success" id="check-1a-btn">Check All 1a Answers</button>
+            <button class="btn btn-outline" id="reset-1a-btn">Reset</button>
+            ${(() => {
+              const hasChecked = this.hasCheckedAny('useOfEnglish1a');
+              if (!hasChecked && !this.isTeacherMode) return '<div id="score-box-1a" class="feedback-box hidden"></div>';
+              let score = 0;
+              ex.items.forEach(item => {
+                const val = (state[item.id] || "").trim().toLowerCase().replace(/[.,!]/g, '');
+                if (val === item.expected.toLowerCase().replace(/[.,!]/g, '')) score++;
+              });
+              return `<div id="score-box-1a" class="feedback-box feedback-info"><strong>Score: ${score} / ${ex.items.length} Correct!</strong></div>`;
+            })()}
+          </div>
         </div>
       `;
     }
@@ -1937,18 +2724,37 @@
           const id = parseInt(btn.getAttribute('data-id'), 10);
           const item = this.data.useOfEnglish.ex1a.items.find(i => i.id === id);
           const val = (this.studentState.useOfEnglish1a[id] || "").trim().toLowerCase().replace(/[.,!]/g, '');
-          const expected = item.expected.toLowerCase().replace(/[.,!]/g, '');
-          this.studentState.checked = this.studentState.checked || {};
-          this.studentState.checked.useOfEnglish1a = this.studentState.checked.useOfEnglish1a || {};
-          this.studentState.checked.useOfEnglish1a[id] = true;
-          this.saveState();
+          const expected = item ? item.expected.toLowerCase().replace(/[.,!]/g, '') : '';
           if (val === expected) {
             this.sfx.playCorrect();
           } else {
             this.sfx.playIncorrect();
           }
-          this.updateView();
+          this.setItemChecked('useOfEnglish1a', id);
         });
+      });
+
+      container.querySelector('#check-1a-btn')?.addEventListener('click', () => {
+        let score = 0;
+        const ex = this.data.useOfEnglish.ex1a;
+        ex.items.forEach(item => {
+          const val = (this.studentState.useOfEnglish1a[item.id] || "").trim().toLowerCase().replace(/[.,!]/g, '');
+          if (val === item.expected.toLowerCase().replace(/[.,!]/g, '')) score++;
+        });
+        if (score === ex.items.length) {
+          this.sfx.playCorrect();
+        } else {
+          this.sfx.playIncorrect();
+        }
+        this.setAllChecked('useOfEnglish1a', true);
+      });
+
+      container.querySelector('#reset-1a-btn')?.addEventListener('click', () => {
+        this.sfx.playClick();
+        this.studentState.useOfEnglish1a = {};
+        if (this.studentState.checked) delete this.studentState.checked.useOfEnglish1a;
+        this.saveState();
+        this.updateView();
       });
     }
 
@@ -1964,7 +2770,7 @@
               <span class="slide-kicker">Page 18 • Use of English: Prepositions</span>
               <h2 class="slide-title">2a. Dependent Prepositions + Gerunds</h2>
             </div>
-            <span class="badge badge-accent">14 High-Yield Cambridge Collocations</span>
+            <span class="badge badge-accent">14 Dependent Prepositions</span>
           </div>
 
           <div class="grammar-rule-callout mb-4">
@@ -1974,24 +2780,28 @@
           <!-- 14 Prepositions Grid -->
           <div class="prep-cards-grid">
             ${ex.items.map(item => {
-              const isChecked = !!(this.studentState.checked && this.studentState.checked.useOfEnglish2a);
+              const show = this.isTeacherMode || this.isItemChecked('useOfEnglish2a', item.id);
               const currentVal = (state[item.id] || "").trim().toLowerCase();
               const isMatch = currentVal === item.prep.toLowerCase() || (item.alt && currentVal === item.alt.toLowerCase());
-              const show = this.isTeacherMode || isChecked;
               return `
                 <div class="prep-card ${show ? (isMatch ? 'prep-correct' : 'prep-incorrect') : ''}">
-                  <span class="prep-num">${item.id}</span>
-                  <div class="prep-content">
+                  <div class="prep-card-main">
+                    <span class="prep-num">${item.id}</span>
                     <span class="prep-verb">${item.phrase}</span>
-                    <input type="text"
-                      class="prep-input"
-                      data-id="${item.id}"
-                      value="${this.isTeacherMode ? item.prep : currentVal}"
-                      placeholder="..."
-                      maxlength="10" />
-                    ${this.isTeacherMode || (isChecked && !isMatch) ? `<span class="prep-key">[${item.prep}]</span>` : ''}
+                    <div class="prep-input-box">
+                      <input type="text"
+                        class="prep-input"
+                        data-id="${item.id}"
+                        value="${this.isTeacherMode ? item.prep : currentVal}"
+                        placeholder="..."
+                        maxlength="10" />
+                      ${this.isTeacherMode || (show && !isMatch) ? `<span class="prep-key-chip">${item.prep}</span>` : ''}
+                    </div>
                   </div>
-                  <div class="prep-tooltip" title="${item.example}">[Example]</div>
+                  <div class="prep-card-actions">
+                    <button class="btn-item-check check-single-prep" data-id="${item.id}" title="Check preposition ${item.id}">Check</button>
+                    <button class="prep-example-btn prep-tooltip" title="${item.example}">Example</button>
+                  </div>
                 </div>
               `;
             }).join('')}
@@ -2000,8 +2810,8 @@
           <div class="actions-bar mt-4">
             <button class="btn btn-success" id="check-preps-btn">Check All 14 Prepositions</button>
             ${(() => {
-              const isChecked = !!(this.studentState.checked && this.studentState.checked.useOfEnglish2a);
-              if (!isChecked && !this.isTeacherMode) return '<div id="preps-score-box" class="feedback-box hidden"></div>';
+              const hasChecked = this.hasCheckedAny('useOfEnglish2a');
+              if (!hasChecked && !this.isTeacherMode) return '<div id="preps-score-box" class="feedback-box hidden"></div>';
               let score = 0;
               ex.items.forEach(item => {
                 const val = (state[item.id] || "").trim().toLowerCase();
@@ -2031,6 +2841,19 @@
         });
       });
 
+      container.querySelectorAll('.check-single-prep').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          const item = ex.items.find(it => it.id.toString() === id.toString());
+          if (item) {
+            const val = (this.studentState.useOfEnglish2a[item.id] || "").trim().toLowerCase();
+            const match = val === item.prep.toLowerCase() || (item.alt && val === item.alt.toLowerCase());
+            if (match) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+          }
+          this.setItemChecked('useOfEnglish2a', id);
+        });
+      });
+
       container.querySelector('#check-preps-btn')?.addEventListener('click', () => {
         let score = 0;
         ex.items.forEach(item => {
@@ -2040,10 +2863,7 @@
           }
         });
         if (score >= 11) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        this.studentState.checked = this.studentState.checked || {};
-        this.studentState.checked.useOfEnglish2a = true;
-        this.saveState();
-        this.updateView();
+        this.setAllChecked('useOfEnglish2a');
       });
     }
 
@@ -2070,10 +2890,9 @@
 
             <div class="phrasal-grid">
               ${ex.matching.map(item => {
-                const isChecked3a = !!(this.studentState.checked && this.studentState.checked.useOfEnglish3a);
                 const currentVal = state[item.id] || "";
                 const isMatch = currentVal === item.meaningId;
-                const show = this.isTeacherMode || isChecked3a;
+                const show = this.isTeacherMode || this.isItemChecked('useOfEnglish3a', item.id);
                 return `
                   <div class="phrasal-card ${show ? (isMatch ? 'card-correct' : 'card-incorrect') : ''}">
                     <div class="phrasal-verb-name">
@@ -2090,7 +2909,8 @@
                         <option value="e" ${(this.isTeacherMode ? item.meaningId : currentVal) === 'e' ? 'selected' : ''}>e. compensate</option>
                         <option value="f" ${(this.isTeacherMode ? item.meaningId : currentVal) === 'f' ? 'selected' : ''}>f. examine</option>
                       </select>
-                      ${this.isTeacherMode || (isChecked3a && !isMatch) ? `<span class="answer-pill">[${item.meaningId}] ${item.meaning}</span>` : ''}
+                      <button class="btn-item-check check-single-3a" data-id="${item.id}" title="Check match">Check</button>
+                      ${this.isTeacherMode || (show && !isMatch) ? `<span class="answer-key-pill">${item.meaningId}. ${item.meaning}</span>` : ''}
                     </div>
                   </div>
                 `;
@@ -2098,10 +2918,10 @@
             </div>
 
             <div class="actions-bar mt-3">
-              <button class="btn btn-success" id="check-phrasal-3a-btn">Check 3a Matching</button>
+              <button class="btn btn-success" id="check-phrasal-3a-btn">Check All 3a Matching</button>
               ${(() => {
-                const isChecked3a = !!(this.studentState.checked && this.studentState.checked.useOfEnglish3a);
-                if (!isChecked3a && !this.isTeacherMode) return '';
+                const hasChecked = this.hasCheckedAny('useOfEnglish3a');
+                if (!hasChecked && !this.isTeacherMode) return '';
                 let score = 0;
                 ex.matching.forEach(item => {
                   if (state[item.id] === item.meaningId) score++;
@@ -2119,7 +2939,7 @@
 
             <div class="rewrites-list">
               ${ex.rewrites.map(rw => {
-                const isChecked3b = !!(this.studentState.checked && this.studentState.checked.useOfEnglish3b);
+                const show = this.isTeacherMode || this.isItemChecked('useOfEnglish3b', rw.id);
                 const currentVal = (this.studentState.useOfEnglish3b && this.studentState.useOfEnglish3b[rw.id]) || "";
                 return `
                   <div class="rewrite-card">
@@ -2134,18 +2954,21 @@
                         data-rwid="${rw.id}"
                         placeholder="Write your rewritten sentence starting with subject..."
                         value="${this.isTeacherMode ? rw.model : currentVal}" />
+                      <button class="btn-item-check check-single-3b" data-id="${rw.id}" title="Check rewrite">Check</button>
                     </div>
-                    <div class="rewrite-reveal ${this.isTeacherMode || isChecked3b ? '' : 'hidden'}">
-                      → Model Answer: <strong>"${rw.model}"</strong>
-                    </div>
+                    ${show ? `
+                      <div class="rewrite-reveal">
+                        <span class="badge badge-success">Model Answer</span> <strong>"${rw.model}"</strong>
+                      </div>
+                    ` : ''}
                   </div>
                 `;
               }).join('')}
             </div>
 
             <div class="actions-bar mt-3">
-              <button class="btn btn-success" id="check-rewrites-3b-btn">Check 3b Rewrites</button>
-              ${(this.studentState.checked && this.studentState.checked.useOfEnglish3b) || this.isTeacherMode ? `
+              <button class="btn btn-success" id="check-rewrites-3b-btn">Check All 3b Rewrites</button>
+              ${this.hasCheckedAny('useOfEnglish3b') || this.isTeacherMode ? `
                 <div class="feedback-box feedback-info">Review the Cambridge model transformations above against your answers.</div>
               ` : ''}
             </div>
@@ -2155,6 +2978,8 @@
     }
 
     bindUseOfEnglish3Events(container) {
+      const ex = this.data.useOfEnglish.ex3;
+
       container.querySelectorAll('.phrasal-sel').forEach(sel => {
         sel.addEventListener('change', (e) => {
           const id = sel.getAttribute('data-id');
@@ -2163,17 +2988,25 @@
         });
       });
 
+      container.querySelectorAll('.check-single-3a').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          const item = ex.matching.find(it => it.id.toString() === id.toString());
+          if (item) {
+            const isMatch = this.studentState.useOfEnglish3a[item.id] === item.meaningId;
+            if (isMatch) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+          }
+          this.setItemChecked('useOfEnglish3a', id);
+        });
+      });
+
       container.querySelector('#check-phrasal-3a-btn')?.addEventListener('click', () => {
         let score = 0;
-        const ex = this.data.useOfEnglish.ex3;
         ex.matching.forEach(item => {
           if (this.studentState.useOfEnglish3a[item.id] === item.meaningId) score++;
         });
         if (score >= 5) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        this.studentState.checked = this.studentState.checked || {};
-        this.studentState.checked.useOfEnglish3a = true;
-        this.saveState();
-        this.updateView();
+        this.setAllChecked('useOfEnglish3a');
       });
 
       container.querySelectorAll('.rewrite-input').forEach(inp => {
@@ -2185,12 +3018,17 @@
         });
       });
 
+      container.querySelectorAll('.check-single-3b').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          this.sfx.playCorrect();
+          this.setItemChecked('useOfEnglish3b', id);
+        });
+      });
+
       container.querySelector('#check-rewrites-3b-btn')?.addEventListener('click', () => {
-        this.studentState.checked = this.studentState.checked || {};
-        this.studentState.checked.useOfEnglish3b = true;
         this.sfx.playCorrect();
-        this.saveState();
-        this.updateView();
+        this.setAllChecked('useOfEnglish3b');
       });
     }
 
@@ -2198,7 +3036,6 @@
     getSlide13HTML() {
       const u = this.data.useOfEnglish;
       const ex = u.ex4;
-      const isChecked = !!(this.studentState.checked && this.studentState.checked.useOfEnglish4);
       return `
         <div class="slide slide-grammar animate-fade-in">
           <div class="slide-header">
@@ -2206,7 +3043,7 @@
               <span class="slide-kicker">Page 18 • Exercise 4</span>
               <h2 class="slide-title">Gerund vs. Infinitive Complementation</h2>
             </div>
-            <span class="badge badge-accent">8 Key Cambridge Exam Patterns</span>
+            <span class="badge badge-accent">8 Exam Patterns</span>
           </div>
 
           <div class="gapfill-exercise-box mb-4">
@@ -2215,25 +3052,32 @@
             </div>
 
             <div class="verb-patterns-list">
-              ${ex.items.map(item => `
+              ${ex.items.map(item => {
+                const itemChecked = this.isTeacherMode || this.isItemChecked('useOfEnglish4', item.id);
+                return `
                 <div class="pattern-item-card" id="pattern-card-${item.id}">
                   <span class="pattern-num">${item.id}.</span>
                   <div class="pattern-sentence-content">
-                    <p class="sentence-text">${this.formatEx4Sentence(item)}</p>
-                    ${this.isTeacherMode || isChecked ? `
+                    <div class="pattern-sentence-row">
+                      <p class="sentence-text">${this.formatEx4Sentence(item)}</p>
+                      <button class="btn-item-check check-single-ex4" data-id="${item.id}" title="Check sentence ${item.id}">Check</button>
+                    </div>
+                    ${itemChecked ? `
                       <div class="pattern-rules-tags">
                         ${item.gaps.map(g => `<span class="rule-chip"><strong>Rule:</strong> ${g.rule}</span>`).join(' ')}
                       </div>
                     ` : ''}
                   </div>
                 </div>
-              `).join('')}
+              `;
+              }).join('')}
             </div>
 
             <div class="gapfill-footer">
               <button class="btn btn-success" id="check-ex4-btn">Check All Sentences</button>
               ${(() => {
-                if (!isChecked && !this.isTeacherMode) return '<div id="ex4-score-box" class="feedback-box hidden"></div>';
+                const hasChecked = this.hasCheckedAny('useOfEnglish4');
+                if (!hasChecked && !this.isTeacherMode) return '<div id="ex4-score-box" class="feedback-box hidden"></div>';
                 let totalGaps = 0;
                 let score = 0;
                 ex.items.forEach(item => {
@@ -2254,12 +3098,12 @@
 
     formatEx4Sentence(item) {
       let raw = item.sentence;
-      const isChecked = !!(this.studentState.checked && this.studentState.checked.useOfEnglish4);
+      const isChecked = this.isTeacherMode || this.isItemChecked('useOfEnglish4', item.id);
       item.gaps.forEach((g, idx) => {
         const gapKey = `${item.id}_${idx}`;
         const currentVal = this.studentState.useOfEnglish4[gapKey] || "";
         const isMatch = currentVal.trim().toLowerCase() === g.correct.toLowerCase();
-        const show = this.isTeacherMode || isChecked;
+        const show = isChecked;
 
         const inputHTML = `
           <span class="inline-gap-box ${show ? (isMatch ? 'gap-ok' : 'gap-err') : ''}">
@@ -2287,6 +3131,23 @@
         });
       });
 
+      container.querySelectorAll('.check-single-ex4').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = parseInt(btn.getAttribute('data-id'), 10);
+          const item = ex.items.find(it => it.id === id);
+          if (item) {
+            let itemCorrect = true;
+            item.gaps.forEach((g, idx) => {
+              const key = `${item.id}_${idx}`;
+              const val = (this.studentState.useOfEnglish4[key] || "").trim().toLowerCase();
+              if (val !== g.correct.toLowerCase()) itemCorrect = false;
+            });
+            if (itemCorrect) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+          }
+          this.setItemChecked('useOfEnglish4', id);
+        });
+      });
+
       container.querySelector('#check-ex4-btn')?.addEventListener('click', () => {
         let totalGaps = 0;
         let score = 0;
@@ -2300,10 +3161,7 @@
         });
 
         if (score >= totalGaps - 2) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        this.studentState.checked = this.studentState.checked || {};
-        this.studentState.checked.useOfEnglish4 = true;
-        this.saveState();
-        this.updateView();
+        this.setAllChecked('useOfEnglish4');
       });
     }
 
@@ -2312,7 +3170,6 @@
       const u = this.data.useOfEnglish;
       const ex = u.ex5;
       const state = this.studentState.useOfEnglish5;
-      const isChecked = !!(this.studentState.checked && this.studentState.checked.useOfEnglish5);
       return `
         <div class="slide slide-grammar animate-fade-in">
           <div class="slide-header">
@@ -2341,7 +3198,7 @@
                 const isMatch = Array.isArray(r.correct)
                   ? r.correct.some(c => c.toLowerCase() === currentVal)
                   : r.correct.toLowerCase() === currentVal;
-                const show = this.isTeacherMode || isChecked;
+                const show = this.isTeacherMode || this.isItemChecked('useOfEnglish5', r.id);
                 return `
                   <div class="rule-poster-item ${show ? (isMatch ? 'rule-correct' : 'rule-incorrect') : ''}">
                     <span class="rule-lead">${r.lead}</span>
@@ -2351,10 +3208,11 @@
                         data-id="${r.id}"
                         value="${this.isTeacherMode ? (r.display || r.correct) : currentVal}"
                         placeholder="..." />
-                      ${this.isTeacherMode || (isChecked && !isMatch) ? `<span class="rule-key">[${r.display || r.correct}]</span>` : ''}
+                      ${this.isTeacherMode || (show && !isMatch) ? `<span class="answer-key-pill">${r.display || r.correct}</span>` : ''}
                     </div>
                     <span class="rule-trail">${r.trail}</span>
-                    ${this.isTeacherMode || isChecked ? `<span class="rule-exp-tag"><strong>Rule:</strong> ${r.rule}</span>` : ''}
+                    <button class="btn-item-check check-single-rule" data-id="${r.id}" title="Check rule ${r.id}">Check</button>
+                    ${show ? `<span class="rule-chip"><strong>Rule:</strong> ${r.rule}</span>` : ''}
                   </div>
                 `;
               }).join('')}
@@ -2363,7 +3221,8 @@
             <div class="poster-footer-bar">
               <button class="btn btn-primary" id="check-rules-btn">Validate 6 Rules</button>
               ${(() => {
-                if (!isChecked && !this.isTeacherMode) return '<div id="rules-score-badge" class="score-badge-large hidden"></div>';
+                const hasChecked = this.hasCheckedAny('useOfEnglish5');
+                if (!hasChecked && !this.isTeacherMode) return '<div id="rules-score-badge" class="score-badge-large hidden"></div>';
                 let score = 0;
                 ex.rules.forEach(r => {
                   const val = (state[r.id] || "").trim().toLowerCase();
@@ -2391,6 +3250,21 @@
         });
       });
 
+      container.querySelectorAll('.check-single-rule').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          const r = ex.rules.find(rule => rule.id.toString() === id.toString());
+          if (r) {
+            const val = (this.studentState.useOfEnglish5[r.id] || "").trim().toLowerCase();
+            const match = Array.isArray(r.correct)
+              ? r.correct.some(c => c.toLowerCase() === val)
+              : r.correct.toLowerCase() === val;
+            if (match) this.sfx.playCorrect(); else this.sfx.playIncorrect();
+          }
+          this.setItemChecked('useOfEnglish5', id);
+        });
+      });
+
       container.querySelector('#check-rules-btn')?.addEventListener('click', () => {
         let score = 0;
         ex.rules.forEach(r => {
@@ -2402,10 +3276,7 @@
         });
 
         if (score === 6) this.sfx.playCorrect(); else this.sfx.playIncorrect();
-        this.studentState.checked = this.studentState.checked || {};
-        this.studentState.checked.useOfEnglish5 = true;
-        this.saveState();
-        this.updateView();
+        this.setAllChecked('useOfEnglish5');
       });
     }
 
